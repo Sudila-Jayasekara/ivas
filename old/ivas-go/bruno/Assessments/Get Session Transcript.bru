@@ -1,0 +1,16 @@
+meta {
+  name: Get Session Transcript
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/assessments/sessions/{{session_id}}/transcript
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+  session_id: b1a60466-4870-4794-944a-b8e7a464860f
+}

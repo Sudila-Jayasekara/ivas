@@ -1,0 +1,29 @@
+meta {
+  name: Set Question Type
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/questions/:id/type
+  body: json
+  auth: none
+}
+
+params:path {
+  id: <REPLACE_WITH_ID>
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "type": "adaptive"
+  }
+}
+
+docs {
+  Set question type (required/adaptive)
+}

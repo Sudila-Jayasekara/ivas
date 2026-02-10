@@ -1,0 +1,25 @@
+meta {
+  name: Submit Response
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/assessments/sessions/{{session_id}}/respond
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "question_instance_id": "{{question_instance_id}}",
+    "response_text": "A loop is a control structure that repeats a block of code multiple times. In this case, the for loop iterates from 0 to 9, printing each number.",
+    "response_type": "text"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8080
+  session_id: b1a60466-4870-4794-944a-b8e7a464860f
+  question_instance_id: 2578b46d-7816-4f35-b75a-5374c1c19f62
+}
