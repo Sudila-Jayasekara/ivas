@@ -1,0 +1,23 @@
+meta {
+  name: Get Question Detailed
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/questions/:question_id/detailed
+  body: none
+  auth: none
+}
+
+params:path {
+  question_id: 65c6c7a0-e8c6-4089-ae7f-6e75cffae04b
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get a single question with its rubric (expected key concepts, grading criteria, max points).
+}

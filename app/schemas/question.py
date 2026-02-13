@@ -59,6 +59,35 @@ class QuestionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RubricOut(BaseModel):
+    id: str
+    question_id: str
+    expected_key_concepts: list[str] | None = None
+    grading_criteria: dict | str | None = None
+    max_points: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class QuestionWithRubricOut(BaseModel):
+    id: str
+    assignment_id: str
+    question_text: str
+    competency: str
+    difficulty: int
+    source: str
+    status: str
+    question_type: str
+    last_modified_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    rubric: RubricOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class UpdateQuestionRequest(BaseModel):
     question_text: Optional[str] = None
     competency: Optional[str] = None

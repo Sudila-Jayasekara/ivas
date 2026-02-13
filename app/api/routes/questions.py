@@ -7,6 +7,7 @@ from app.schemas.question import (
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     QuestionOut,
+    QuestionWithRubricOut,
     SetQuestionTypeRequest,
     UpdateQuestionRequest,
 )
@@ -43,12 +44,16 @@ async def get_questions(
     status: Optional[str] = Query(None),
     competency: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
+    detailed: bool = Query(False, description="Include rubric data"),
     svc: QuestionService = Depends(get_question_service),
 ):
     questions = await svc.get_questions_by_assignment(
         assignment_id, status, competency, type
     )
-    data = [QuestionOut.model_validate(q) for q in questions]
+    if detailed:
+        data = [QuestionWithRubricOut.model_validate(q) for q in questions]
+    else:
+        data = [QuestionOut.model_validate(q) for q in questions]
     return {"data": data, "count": len(data)}
 
 
@@ -63,6 +68,19 @@ async def get_question(
     if not q:
         raise HTTPException(status_code=404, detail="question not found")
     return QuestionOut.model_validate(q)
+
+
+# --- Single question with rubric ---
+
+@router.get("/questions/{question_id}/detailed", response_model=QuestionWithRubricOut)
+async def get_question_with_rubric(
+    question_id: str,
+    svc: QuestionService = Depends(get_question_service),
+):
+    q = await svc.get_question(question_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="question not found")
+    return QuestionWithRubricOut.model_validate(q)
 
 
 # --- Update ---

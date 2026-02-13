@@ -53,11 +53,21 @@ class QuestionService:
 
         question_ids: list[str] = []
         for q in ai_questions:
+            # Final safety check: ensure difficulty is within requested range
+            clamped_difficulty = max(
+                req.difficulty_min, min(req.difficulty_max, q.difficulty)
+            )
+            if clamped_difficulty != q.difficulty:
+                logger.warning(
+                    "Question difficulty %d outside range %d-%d, clamped to %d",
+                    q.difficulty, req.difficulty_min, req.difficulty_max, clamped_difficulty,
+                )
+
             question = Question(
                 assignment_id=assignment_id,
                 question_text=q.question_text,
                 competency=q.competency,
-                difficulty=q.difficulty,
+                difficulty=clamped_difficulty,
                 source=QuestionSource.ai_generated,
                 status=QuestionStatus.draft,
                 question_type=QuestionType.required,
