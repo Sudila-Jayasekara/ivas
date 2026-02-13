@@ -1,0 +1,23 @@
+meta {
+  name: Abandon Session
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/assessments/sessions/:session_id/abandon
+  body: none
+  auth: none
+}
+
+params:path {
+  session_id: <REPLACE_WITH_SESSION_ID>
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Abandon an in-progress assessment session
+}
