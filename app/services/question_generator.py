@@ -34,47 +34,75 @@ class QuestionGenerator:
     # ------------------------------------------------------------------
 
     def _build_prompt(
-        self,
-        title: str,
-        programming_language: str,
-        competency: str,
-        difficulty_min: int,
-        difficulty_max: int,
-        learning_objectives: list[str],
-        num_questions: int,
-    ) -> str:
-        return f"""You are an expert programming instructor creating assessment questions.
+    self,
+    title: str,
+    programming_language: str,
+    competency: str,
+    difficulty_min: int,
+    difficulty_max: int,
+    learning_objectives: list[str],
+    num_questions: int,
+) -> str:
+
+        objectives = ", ".join(learning_objectives)
+
+        return f"""
+You are an expert programming instructor creating oral viva questions to assess students' DEEP UNDERSTANDING of programming concepts.
 
 Generate {num_questions} unique viva voce (oral exam) questions for a programming assignment.
 
-**Assignment Details:**
+CRITICAL REQUIREMENTS:
+- Questions MUST test conceptual understanding, NOT syntax or code writing
+- Ask WHY and WHEN, not HOW TO write code
+- Questions should reveal whether student truly understands the concept
+- Avoid memorization-based questions
+- Focus on trade-offs, comparisons, real-world scenarios, and problem-solving
+
+Assignment Details:
 - Title: {title}
 - Programming Language: {programming_language}
 - Target Competency: {competency}
 - Difficulty Range: {difficulty_min} to {difficulty_max} (scale 1-5)
-- Learning Objectives: {', '.join(learning_objectives)}
+- Learning Objectives: {objectives}
 
-**Requirements:**
-1. Questions should test understanding of "{competency}" concept
-2. Each question should have a different difficulty level within the range
-3. Questions should be open-ended, suitable for verbal answers
-4. Include expected key concepts the student should mention
-5. Provide grading criteria
+Question Types to Generate:
+1. Comparison questions
+2. Trade-off questions
+3. Design questions
+4. Debugging/Analysis
+5. Real-world application
 
-**Output Format (JSON array):**
-```json
+BAD Examples:
+- Explain how to write a for loop
+- Show syntax for a while loop
+- Write a function that does X
+
+GOOD Examples:
+- Compare for loops and while loops. When use each?
+- Trade-offs between iteration and recursion?
+- Loop runs infinitely. Possible causes?
+
+Output Format (JSON array only):
 [
   {{
-    "question_text": "Explain how...",
+    "question_text": "Compare for loops and while loops in {programming_language}. When use each?",
     "difficulty": 2,
-    "expected_key_concepts": ["concept1", "concept2"],
-    "grading_criteria": "Full marks if student explains...",
+    "expected_key_concepts": ["iteration control", "termination", "use cases"],
+    "grading_criteria": "Student explains differences, scenarios, trade-offs",
     "max_points": 10
   }}
 ]
-```
 
-Generate exactly {num_questions} questions. Return ONLY valid JSON array, no other text."""
+Difficulty Guidelines:
+- Level 1-2: Basic comparisons
+- Level 3: Trade-offs
+- Level 4-5: Complex scenarios
+
+Generate exactly {num_questions} questions.
+Return ONLY valid JSON array.
+""".strip()
+
+
 
     # ------------------------------------------------------------------
     # Parse
