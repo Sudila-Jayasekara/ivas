@@ -14,6 +14,7 @@ from app.api.routes.questions import router as questions_router
 from app.api.routes.assessments import router as assessments_router
 from app.api.routes.students import router as students_router
 from app.api.routes.instructors import router as instructors_router
+from app.api.routes.llm import router as llm_router
 
 # --- logging ---
 
@@ -64,6 +65,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(mock_router)
+app.include_router(llm_router)
 
 # All v1 routes
 app.include_router(questions_router, prefix="/api/v1")
