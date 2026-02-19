@@ -22,10 +22,17 @@ class Settings(BaseSettings):
     db_max_overflow: int = 25
     db_pool_timeout: int = 30
 
+    # LLM Provider Selection
+    llm_provider: str = "ollama"  # Options: "ollama" or "gemini"
+
     # Ollama / AI
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
     ollama_timeout: int = 300
+
+    # Gemini / AI
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"  # Options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-pro-preview-06-05
 
     # Logging
     log_level: str = "debug"
