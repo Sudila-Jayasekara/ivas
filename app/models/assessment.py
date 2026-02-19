@@ -22,7 +22,6 @@ class AssessmentSession(Base):
     )
     code_context: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-
 class AssessmentQuestionInstance(Base):
     __tablename__ = "assessment_question_instances"
 
