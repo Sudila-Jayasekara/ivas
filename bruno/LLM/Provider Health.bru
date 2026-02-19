@@ -1,0 +1,19 @@
+meta {
+  name: Provider Health
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/llm/provider/health
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Check if the current LLM provider is reachable and working.
+}

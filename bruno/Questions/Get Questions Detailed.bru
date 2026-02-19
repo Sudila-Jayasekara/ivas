@@ -5,20 +5,19 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/v1/assignments/:assignment_id/questions?detailed=true
+  url: {{baseUrl}}/api/v1/assignments/:assignment_id/questions/detailed
   body: none
   auth: none
 }
 
-params:path {
-  assignment_id: assign-001
-}
-
 params:query {
-  detailed: true
   ~status: approved
   ~competency: loops
   ~question_type: required
+}
+
+params:path {
+  assignment_id: assign-012
 }
 
 headers {
@@ -26,5 +25,5 @@ headers {
 }
 
 docs {
-  List questions for an assignment with rubric data included. Set detailed=true to include rubrics. Optional filters: status, competency, question_type.
+  List questions for an assignment with rubric data included. Optional filters: status, competency, question_type.
 }
