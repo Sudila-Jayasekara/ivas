@@ -1,0 +1,23 @@
+meta {
+  name: Get Course
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/mock/courses/:course_id
+  body: none
+  auth: none
+}
+
+params:path {
+  course_id: course-001
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get a mock course by ID
+}

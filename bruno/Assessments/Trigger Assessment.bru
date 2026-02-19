@@ -1,0 +1,29 @@
+meta {
+  name: Trigger Assessment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/assessments/trigger
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "student_id": "stud-001",
+    "assignment_id": "assign-001",
+    "task_id": "task-001",
+    "code_context": "def hello():\n    print('hello world')",
+    "competencies": ["loops", "iteration"]
+  }
+}
+
+docs {
+  Trigger a new assessment session for a student
+}

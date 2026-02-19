@@ -1,0 +1,29 @@
+meta {
+  name: Get Questions Detailed
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/assignments/:assignment_id/questions/detailed
+  body: none
+  auth: none
+}
+
+params:query {
+  ~status: approved
+  ~competency: loops
+  ~question_type: required
+}
+
+params:path {
+  assignment_id: assign-012
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  List questions for an assignment with rubric data included. Optional filters: status, competency, question_type.
+}

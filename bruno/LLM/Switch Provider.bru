@@ -1,0 +1,30 @@
+meta {
+  name: Switch Provider
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/llm/provider/switch
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "provider": "gemini"
+  }
+}
+
+docs {
+  Hot-swap the active LLM provider at runtime (no restart needed).
+  
+  Supported providers: "ollama", "gemini"
+  
+  Change the "provider" value in the body to switch.
+}

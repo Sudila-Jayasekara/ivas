@@ -1,0 +1,29 @@
+meta {
+  name: Approve Question
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/questions/:question_id/approve
+  body: json
+  auth: none
+}
+
+params:path {
+  question_id: <REPLACE_WITH_ID>
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "approved_by": "inst-001"
+  }
+}
+
+docs {
+  Approve a question – sets status to approved
+}
