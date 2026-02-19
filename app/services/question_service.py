@@ -41,6 +41,23 @@ class QuestionService:
             req.competencies,
         )
 
+        # Fetch existing questions for this assignment so the LLM can avoid duplicates
+        existing_db_questions = await self.question_repo.find_by_assignment_id(assignment_id)
+        existing_for_dedup = [
+            {
+                "competency": q.competency,
+                "difficulty": q.difficulty,
+                "question_text": q.question_text,
+            }
+            for q in existing_db_questions
+            if q.status != "archived"
+        ]
+        logger.info(
+            "Found %d existing questions for assignment=%s (used for deduplication)",
+            len(existing_for_dedup),
+            assignment_id,
+        )
+
         ai_questions = question_generator.generate_questions(
             title=req.title,
             competencies=req.competencies,
@@ -49,6 +66,7 @@ class QuestionService:
             difficulty_max=req.difficulty_max,
             num_questions_per_competency=req.num_questions_per_competency,
             programming_language=req.programming_language,
+            existing_questions=existing_for_dedup if existing_for_dedup else None,
         )
 
         question_ids: list[str] = []
