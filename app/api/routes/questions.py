@@ -57,6 +57,23 @@ async def get_questions(
     return {"data": data, "count": len(data)}
 
 
+# --- List by assignment with rubrics ---
+
+@router.get("/assignments/{assignment_id}/questions/detailed")
+async def get_questions_with_rubrics(
+    assignment_id: str,
+    status: Optional[str] = Query(None),
+    competency: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),
+    svc: QuestionService = Depends(get_question_service),
+):
+    questions = await svc.get_questions_by_assignment(
+        assignment_id, status, competency, type
+    )
+    data = [QuestionWithRubricOut.model_validate(q) for q in questions]
+    return {"data": data, "count": len(data)}
+
+
 # --- Single question ---
 
 @router.get("/questions/{question_id}", response_model=QuestionOut)
