@@ -11,7 +11,7 @@ post {
 }
 
 params:path {
-  assignment_id: assign-015
+  assignment_id: {{assignment_id}}
 }
 
 headers {
@@ -32,10 +32,6 @@ body:json {
     "num_questions_per_competency": 5,
     "programming_language": "Python"
   }
-}
-
-vars:pre-request {
-  baseUrl: localhost:8080
 }
 
 docs {
