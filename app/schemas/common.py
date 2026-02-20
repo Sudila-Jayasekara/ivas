@@ -1,3 +1,10 @@
+"""
+Common API Schemas
+
+Defines generic Pydantic models used across multiple API routes, such as standard
+response formats for health checks and list endpoints.
+"""
+
 from typing import Any
 
 from pydantic import BaseModel

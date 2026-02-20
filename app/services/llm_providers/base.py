@@ -1,4 +1,10 @@
-"""Base LLM Provider Interface."""
+"""
+Base LLM Provider Interface.
+
+Defines the contract that all concrete LLM providers (e.g., Ollama, Gemini) must implement.
+Flow: The factory creates an instance of a provider, and the LLMService delegates
+generation requests to that instance via this interface.
+"""
 
 from abc import ABC, abstractmethod
 

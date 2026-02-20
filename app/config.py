@@ -1,3 +1,11 @@
+"""
+Application Configuration
+
+Loads environment variables and provides configuration settings for the
+entire application, including database connections, LLM providers, and server setup.
+Services and repositories use these settings to connect to external systems.
+"""
+
 from pydantic_settings import BaseSettings
 
 

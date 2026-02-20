@@ -1,3 +1,14 @@
+"""
+Question Service
+
+Core business logic for managing the question bank. Orchestrates:
+1. Question Generation: Calls the QuestionGenerator (LLM), maps results to
+   SQLAlchemy Models, and saves them via QuestionRepository and RubricRepository.
+2. Question CRUD: Retrieves questions, updates them (logging changes via EditHistoryRepository),
+   and approves or archives them.
+This service acts as the bridge between the API routes and the data/LLM layers.
+"""
+
 import json
 import logging
 from datetime import datetime, timezone

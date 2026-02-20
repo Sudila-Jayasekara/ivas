@@ -1,3 +1,12 @@
+"""
+Database Connection & Session Management
+
+This module manages the connection pool to the PostgreSQL database using SQLAlchemy
+and asyncpg. It configures the engine, creates the database if it doesn't exist,
+automatically migrates tables based on Models, and provides a session dependency
+(`get_session`) used by API routes and Repositories for data access.
+"""
+
 import logging
 from typing import AsyncGenerator
 

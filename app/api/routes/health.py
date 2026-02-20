@@ -1,3 +1,11 @@
+"""
+Health Check API Router
+
+Provides simple endpoints used by monitoring systems or load balancers to check
+if the application and its dependencies (Database, LLM provider) are reachable
+and functioning correctly.
+"""
+
 from fastapi import APIRouter
 
 from app.database import health_check

@@ -1,3 +1,11 @@
+"""
+Mock Data Schemas
+
+Defines Pydantic models used for generating and validating mock data structures,
+primarily representing the external learning management system (LMS) or core
+platform entities like Students, Courses, and Instructors.
+"""
+
 from pydantic import BaseModel
 
 

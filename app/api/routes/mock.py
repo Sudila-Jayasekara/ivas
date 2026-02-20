@@ -1,3 +1,11 @@
+"""
+Mock Data API Router
+
+Provides static or dummy data for testing the frontend or generating sample
+assignments. Flow: Client requests mock data -> Router returns hardcoded dictionaries
+conforming to Mock Data schemas (no database interaction).
+"""
+
 from datetime import datetime
 
 from fastapi import APIRouter

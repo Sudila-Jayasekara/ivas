@@ -1,3 +1,11 @@
+"""
+Question Database Models
+
+Defines the SQLAlchemy ORM models representing questions, their associated
+rubrics, and edit history. These models define the schema for the questions
+table and related entities in the PostgreSQL database, used by the QuestionRepository.
+"""
+
 import enum
 from datetime import datetime, timezone
 

@@ -1,3 +1,11 @@
+"""
+Students API Router
+
+Handles HTTP requests specifically for the Student portal. Endpoints here fetch
+student-specific data, such as their past assessment sessions and performance,
+by querying the AssessmentService.
+"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query

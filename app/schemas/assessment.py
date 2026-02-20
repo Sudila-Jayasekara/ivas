@@ -1,3 +1,11 @@
+"""
+Assessment API Schemas
+
+Defines Pydantic models (schemas) for the assessment module. These schemas are
+used by the FastAPI routes to validate incoming HTTP request bodies and serialize
+outgoing HTTP response data for assessment sessions and student interactions.
+"""
+
 from datetime import datetime
 from typing import Optional
 

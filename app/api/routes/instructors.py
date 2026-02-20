@@ -1,3 +1,11 @@
+"""
+Instructors API Router
+
+Handles HTTP requests specifically for the Instructor portal/dashboard.
+Endpoints here fetch aggregated data, such as a list of assessment sessions
+completed by students, by calling the AssessmentService.
+"""
+
 from datetime import datetime
 from typing import Optional
 

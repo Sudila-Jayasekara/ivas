@@ -1,4 +1,10 @@
-"""Google Gemini LLM Provider."""
+"""
+Google Gemini LLM Provider.
+
+Implements the BaseLLMProvider interface for Google's Gemini models using the `google-genai` SDK.
+Flow: Receives prompts from LLMService, formats them into Gemini API requests,
+and returns the text response.
+"""
 
 import logging
 from google import genai

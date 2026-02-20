@@ -1,3 +1,13 @@
+"""
+Questions API Router
+
+Handles HTTP requests for managing the question bank. Includes endpoints to:
+1. Generate new questions (calls QuestionService -> LLM).
+2. Fetch questions by assignment (calls QuestionService -> QuestionRepository).
+3. Approve, edit, or archive questions.
+Flow: Validates incoming request -> Passes data to QuestionService -> Returns serialized models.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 

@@ -1,3 +1,15 @@
+"""
+Assessment Service
+
+Core business logic for conducting an assessment session. It orchestrates
+the flow between a student requesting an assessment to the LLM generating
+questions and evaluating answers. This service:
+1. Triggers an assessment (creates a session and fetches the first question).
+2. Submits responses (records student answers, calculates time taken, gets the next question).
+3. Evaluates when the assessment is complete.
+4. Returns session transcripts for instructors.
+"""
+
 import logging
 from datetime import datetime, timezone
 from typing import Optional
