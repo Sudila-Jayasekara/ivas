@@ -1,4 +1,10 @@
-"""LLM Provider Factory."""
+"""
+LLM Provider Factory.
+
+Responsible for instantiating the correct LLM provider class based on the configuration.
+Flow: Called by LLMService during initialization or when hot-swapping providers.
+It reads the provider name and creates the matching concrete implementation.
+"""
 
 import logging
 from typing import Literal

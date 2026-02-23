@@ -1,3 +1,12 @@
+"""
+Main Application Entrypoint
+
+This file initializes the FastAPI application, configures middleware,
+sets up the application lifespan (database connection and shutdown),
+and includes all the API routers. The flow of a request starts here
+and is routed to the appropriate endpoint defined in app/api/routes.
+"""
+
 import logging
 
 from contextlib import asynccontextmanager

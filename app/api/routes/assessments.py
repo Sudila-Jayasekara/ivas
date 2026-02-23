@@ -1,3 +1,12 @@
+"""
+Assessments API Router
+
+Handles HTTP requests related to conducting an assessment. Endpoints here receive
+requests from the frontend (Student App), validate the payload using Pydantic schemas,
+and call the AssessmentService to trigger sessions or submit answers. The results
+are then serialized back to the client.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_assessment_service

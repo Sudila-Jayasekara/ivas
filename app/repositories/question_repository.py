@@ -1,3 +1,12 @@
+"""
+Question Repository
+
+Data access layer for Question models. Provides CRUD operations for questions,
+such as creating new generated/manual questions, retrieving questions by assignment,
+updating question details, and archiving (soft-delete). These methods interact
+directly with the database session and return SQLAlchemy ORM objects to the Services.
+"""
+
 from typing import Optional
 
 from sqlalchemy import select, update

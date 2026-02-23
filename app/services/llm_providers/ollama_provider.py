@@ -1,4 +1,10 @@
-"""Ollama LLM Provider."""
+"""
+Ollama LLM Provider.
+
+Implements the BaseLLMProvider interface for local Ollama models.
+Flow: Receives prompts from LLMService, sends them to the local Ollama instance
+via its REST API, and returns the text response.
+"""
 
 import logging
 from ollama import Client

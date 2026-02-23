@@ -1,4 +1,10 @@
-"""LLM provider management endpoints — switch providers at runtime."""
+"""
+LLM Provider API Router
+
+Management endpoints to view and switch the active LLM provider at runtime.
+Flow: Frontend sends a request to switch providers -> Router calls LLMService ->
+LLMService hot-swaps the underlying BaseLLMProvider implementation.
+"""
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel

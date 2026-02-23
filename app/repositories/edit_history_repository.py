@@ -1,3 +1,11 @@
+"""
+Edit History Repository
+
+Data access layer for QuestionEditHistory models. Functions in this repository
+are called by the Services layer to record changes made to questions over time
+by instructors, and to retrieve the history of a specific question.
+"""
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

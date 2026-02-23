@@ -1,5 +1,11 @@
 """
-Centralized LLM Service — single place to manage & switch providers at runtime.
+Centralized LLM Service
+
+Provides a single interface to manage and switch between different LLM providers
+(e.g., Ollama, Gemini) at runtime. 
+Flow: Other services (like question_generator) call `llm_service.generate(prompt)`,
+which delegates to the currently active provider to call the external API and
+return the generated text.
 
 Usage in any service:
     from app.services.llm_service import llm_service

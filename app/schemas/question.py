@@ -1,3 +1,11 @@
+"""
+Question API Schemas
+
+Defines Pydantic models for question generation and CRUD operations. Used by
+the FastAPI routes in app/api/routes/questions.py to validate incoming requests
+(like AI generation parameters) and format outgoing question and rubric data.
+"""
+
 from datetime import datetime
 from typing import Optional
 

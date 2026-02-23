@@ -1,3 +1,11 @@
+"""
+Rubric Repository
+
+Data access layer for Rubric models. Handles operations for creating and updating
+grading rubrics associated with questions. Called by the QuestionService when
+new questions are generated along with their rubrics.
+"""
+
 from typing import Optional
 
 from sqlalchemy import select

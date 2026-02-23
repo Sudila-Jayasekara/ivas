@@ -1,3 +1,12 @@
+"""
+Assessment Database Models
+
+Defines the SQLAlchemy ORM models for the assessment module, representing how
+assessment sessions, questions asked during a session, and student responses
+are stored in the PostgreSQL database. These models are used by Repositories
+to read and write data.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
@@ -21,7 +30,6 @@ class AssessmentSession(Base):
         DateTime(timezone=True), nullable=True
     )
     code_context: Mapped[str | None] = mapped_column(Text, nullable=True)
-
 
 class AssessmentQuestionInstance(Base):
     __tablename__ = "assessment_question_instances"

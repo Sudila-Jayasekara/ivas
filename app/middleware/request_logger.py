@@ -1,3 +1,12 @@
+"""
+Request Logging Middleware
+
+Intercepts every incoming HTTP request before it reaches the API routes.
+It generates a unique request_id, tracks the execution time of the request,
+and logs the request/response details (method, path, status, latency) to help
+with debugging and monitoring the API flow.
+"""
+
 import logging
 import time
 import uuid

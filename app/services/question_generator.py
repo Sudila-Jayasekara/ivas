@@ -1,3 +1,13 @@
+"""
+Question Generator Service
+
+Constructs detailed prompts and coordinates with the LLMService to generate
+programming questions and rubrics based on competencies and difficulty levels.
+Flow: Receives generation parameters from QuestionService, builds a strict prompt
+to enforce uniqueness and format, sends it to the LLM, and parses the JSON response
+into `GeneratedQuestionAI` schemas.
+"""
+
 import json
 import logging
 
