@@ -1,0 +1,23 @@
+meta {
+  name: Get Question
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/questions/:question_id
+  body: none
+  auth: none
+}
+
+params:path {
+  question_id: {{question_id}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get a single question by ID
+}

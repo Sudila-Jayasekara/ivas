@@ -1,0 +1,23 @@
+meta {
+  name: Get Student
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/mock/students/:student_id
+  body: none
+  auth: none
+}
+
+params:path {
+  student_id: {{student_id}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get a mock student by ID
+}

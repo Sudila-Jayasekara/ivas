@@ -1,0 +1,29 @@
+meta {
+  name: Get Questions
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/assignments/:assignment_id/questions
+  body: none
+  auth: none
+}
+
+params:query {
+  ~status: approved
+  ~competency: loops
+  ~question_type: required
+}
+
+params:path {
+  assignment_id: {{assignment_id}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  List questions for an assignment. Optional filters: status, competency, question_type.
+}

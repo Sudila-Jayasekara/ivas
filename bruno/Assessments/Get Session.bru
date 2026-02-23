@@ -1,0 +1,23 @@
+meta {
+  name: Get Session
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/assessments/sessions/:session_id
+  body: none
+  auth: none
+}
+
+params:path {
+  session_id: {{session_id}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get assessment session details including questions and responses
+}

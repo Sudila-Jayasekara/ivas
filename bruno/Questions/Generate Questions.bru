@@ -1,0 +1,39 @@
+meta {
+  name: Generate Questions
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/assignments/:assignment_id/generate-questions
+  body: json
+  auth: none
+}
+
+params:path {
+  assignment_id: {{assignment_id}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "title": "Introduction to Loops",
+    "competencies": ["loops", "iteration", "control-flow"],
+    "learning_objectives": [
+      "Understand for loops",
+      "Apply while loops",
+      "Choose appropriate loop type"
+    ],
+    "difficulty_min": 1,
+    "difficulty_max": 3,
+    "num_questions_per_competency": 5,
+    "programming_language": "Python"
+  }
+}
+
+docs {
+  Generate AI questions for an assignment via Ollama
+}

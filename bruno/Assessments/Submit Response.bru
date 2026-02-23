@@ -1,0 +1,31 @@
+meta {
+  name: Submit Response
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/assessments/sessions/:session_id/respond
+  body: json
+  auth: none
+}
+
+params:path {
+  session_id: {{session_id}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "question_instance_id": "{{question_instance_id}}",
+    "response_text": "A for loop iterates over a sequence, while a while loop continues until a condition is false. For loops are better when you know the number of iterations.",
+    "response_type": "text"
+  }
+}
+
+docs {
+  Submit a student response to a question in the assessment session
+}

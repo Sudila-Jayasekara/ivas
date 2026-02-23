@@ -1,0 +1,23 @@
+meta {
+  name: Get Assignment
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/mock/assignments/:assignment_id
+  body: none
+  auth: none
+}
+
+params:path {
+  assignment_id: {{assignment_id}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get a mock assignment by ID
+}

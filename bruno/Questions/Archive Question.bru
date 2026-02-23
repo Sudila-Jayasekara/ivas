@@ -1,0 +1,23 @@
+meta {
+  name: Archive Question
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/questions/:question_id
+  body: none
+  auth: none
+}
+
+params:path {
+  question_id: {{question_id}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Soft delete (archive) a question
+}

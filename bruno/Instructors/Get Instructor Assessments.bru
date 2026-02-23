@@ -1,0 +1,29 @@
+meta {
+  name: Get Instructor Assessments
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/instructors/:instructor_id/assessments
+  body: none
+  auth: none
+}
+
+params:path {
+  instructor_id: {{instructor_id}}
+}
+
+params:query {
+  ~status: completed
+  ~student_id: stud-001
+  ~assignment_id: assign-001
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Get assessment sessions visible to an instructor. Optional filters: status, student_id, assignment_id.
+}
