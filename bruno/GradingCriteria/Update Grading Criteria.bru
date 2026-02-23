@@ -1,0 +1,33 @@
+meta {
+  name: Update Grading Criteria
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/grading-criteria/:criteria_id
+  body: json
+  auth: none
+}
+
+params:path {
+  criteria_id: {{criteria_id}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "marking_criteria": "Full marks if student can (1) correctly identify all operations and their purpose, (2) explain insertion and deletion with concrete examples, (3) state the correct time complexity for each operation."
+  }
+}
+
+docs {
+  API 3 — Lecturer edits a single grading criteria row they disagree with.
+  All fields are optional (send only what you want to change):
+    competency, difficulty_level, level_label, level_description,
+    marking_criteria, max_points, programming_language, learning_objectives.
+  Set criteria_id in the local environment before sending.
+}
