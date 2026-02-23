@@ -19,6 +19,7 @@ from app.middleware.request_logger import RequestLoggerMiddleware
 
 from app.api.routes.health import router as health_router
 from app.api.routes.mock import router as mock_router
+from app.api.routes.grading_criteria import router as grading_criteria_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.assessments import router as assessments_router
 from app.api.routes.students import router as students_router
@@ -77,6 +78,7 @@ app.include_router(mock_router)
 app.include_router(llm_router)
 
 # All v1 routes
+app.include_router(grading_criteria_router, prefix="/api/v1")
 app.include_router(questions_router, prefix="/api/v1")
 app.include_router(assessments_router, prefix="/api/v1")
 app.include_router(students_router, prefix="/api/v1")
