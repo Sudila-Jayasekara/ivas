@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/api/v1/assignments/:assignment_id/generate-questions
+  url: {{baseUrl}}/api/v1/assignments/:assignment_id/questions/generate
   body: json
   auth: none
 }
@@ -20,20 +20,13 @@ headers {
 
 body:json {
   {
-    "title": "Introduction to Loops",
-    "competencies": ["loops", "iteration", "control-flow"],
-    "learning_objectives": [
-      "Understand for loops",
-      "Apply while loops",
-      "Choose appropriate loop type"
-    ],
-    "difficulty_min": 1,
-    "difficulty_max": 3,
-    "num_questions_per_competency": 5,
-    "programming_language": "Python"
+    "num_questions_per_level": 1
   }
 }
 
 docs {
-  Generate AI questions for an assignment via Ollama
+  API 4 — Generate questions from saved grading criteria.
+  Requires grading criteria to already exist for the assignment
+  (run "Generate Grading Criteria" first).
+  num_questions_per_level: how many questions to generate per grading-criteria row.
 }

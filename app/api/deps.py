@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.services.assessment_service import AssessmentService
+from app.services.grading_criteria_service import GradingCriteriaService
 from app.services.question_service import QuestionService
 
 
@@ -17,6 +18,12 @@ async def get_question_service(
     session: AsyncSession = Depends(get_db),
 ) -> QuestionService:
     return QuestionService(session)
+
+
+async def get_grading_criteria_service(
+    session: AsyncSession = Depends(get_db),
+) -> GradingCriteriaService:
+    return GradingCriteriaService(session)
 
 
 async def get_assessment_service(

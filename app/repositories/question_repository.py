@@ -1,18 +1,15 @@
 """
 Question Repository
 
-Data access layer for Question models. Provides CRUD operations for questions,
-such as creating new generated/manual questions, retrieving questions by assignment,
-updating question details, and archiving (soft-delete). These methods interact
-directly with the database session and return SQLAlchemy ORM objects to the Services.
+Data access layer for Question models. Provides CRUD operations for questions.
 """
 
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.question import Question, QuestionStatus, QuestionType
+from app.models.question import Question
 
 
 class QuestionRepository:
@@ -47,7 +44,6 @@ class QuestionRepository:
         assignment_id: str,
         status: Optional[str] = None,
         competency: Optional[str] = None,
-        question_type: Optional[str] = None,
     ) -> list[Question]:
         stmt = select(Question).where(Question.assignment_id == assignment_id)
 
@@ -55,8 +51,6 @@ class QuestionRepository:
             stmt = stmt.where(Question.status == status)
         if competency:
             stmt = stmt.where(Question.competency == competency)
-        if question_type:
-            stmt = stmt.where(Question.question_type == question_type)
 
         stmt = stmt.order_by(Question.created_at.desc())
         result = await self.session.execute(stmt)
@@ -66,22 +60,3 @@ class QuestionRepository:
         await self.session.merge(question)
         await self.session.flush()
         return question
-
-    async def update_status(self, question_id: str, status: QuestionStatus) -> None:
-        await self.session.execute(
-            update(Question)
-            .where(Question.id == question_id)
-            .values(status=status)
-        )
-        await self.session.flush()
-
-    async def update_type(self, question_id: str, q_type: QuestionType) -> None:
-        await self.session.execute(
-            update(Question)
-            .where(Question.id == question_id)
-            .values(question_type=q_type)
-        )
-        await self.session.flush()
-
-    async def soft_delete(self, question_id: str) -> None:
-        await self.update_status(question_id, QuestionStatus.archived)

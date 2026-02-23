@@ -11,9 +11,8 @@ get {
 }
 
 params:query {
-  ~status: approved
+  ~status: draft
   ~competency: loops
-  ~question_type: required
 }
 
 params:path {
@@ -25,5 +24,6 @@ headers {
 }
 
 docs {
-  List questions for an assignment. Optional filters: status, competency, question_type.
+  API 5 — List all generated questions for an assignment.
+  Optional query filters: status (draft/approved), competency.
 }

@@ -1,14 +1,16 @@
 from app.schemas.common import HealthResponse, ListResponse
+from app.schemas.grading_criteria import (
+    GenerateGradingCriteriaRequest,
+    GenerateGradingCriteriaResponse,
+    GradingCriteriaAI,
+    GradingCriteriaOut,
+    UpdateGradingCriteriaRequest,
+)
 from app.schemas.question import (
-    ApproveQuestionRequest,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     GeneratedQuestionAI,
     QuestionOut,
-    RubricResponse,
-    SetQuestionTypeRequest,
-    UpdateQuestionRequest,
-    DifficultyRange,
 )
 from app.schemas.assessment import (
     TriggerAssessmentRequest,

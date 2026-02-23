@@ -1,5 +1,6 @@
 from app.models.base import Base
-from app.models.question import Question, Rubric, QuestionEditHistory
+from app.models.grading_criteria import GradingCriteria
+from app.models.question import Question
 from app.models.assessment import (
     AssessmentSession,
     AssessmentQuestionInstance,
@@ -9,9 +10,8 @@ from app.models.assessment import (
 
 __all__ = [
     "Base",
+    "GradingCriteria",
     "Question",
-    "Rubric",
-    "QuestionEditHistory",
     "AssessmentSession",
     "AssessmentQuestionInstance",
     "StudentResponse",

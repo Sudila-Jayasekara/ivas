@@ -1,0 +1,33 @@
+meta {
+  name: Generate Grading Criteria
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/assignments/:assignment_id/grading-criteria/generate
+  body: json
+  auth: none
+}
+
+params:path {
+  assignment_id: {{assignment_id}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "assignment_text": "Assignment: Data Structures and Algorithms in Python\n\nIn this assignment you will implement and analyse common data structures and algorithms using Python. You are required to:\n\n1. Implement a linked list class with insert, delete, and search operations.\n2. Implement a binary search tree with insert, search, and in-order traversal.\n3. Analyse the time and space complexity of each operation using Big-O notation.\n4. Write unit tests for all implemented methods.\n5. Compare the performance of your implementations against Python's built-in list and dict.\n\nLearning Outcomes:\n- Understand the properties and use cases of fundamental data structures.\n- Apply algorithmic thinking to implement efficient solutions.\n- Analyse and evaluate the trade-offs between different data structures.\n- Write clean, well-documented Python code with tests."
+  }
+}
+
+docs {
+  API 1 — Lecturer provides raw assignment text.
+  AI extracts: competencies, difficulty levels, Bloom's taxonomy labels,
+  marking criteria, programming language, and learning objectives.
+  All results are saved as GradingCriteria rows in the database.
+  Re-running this endpoint replaces any previously generated criteria for the assignment.
+}
