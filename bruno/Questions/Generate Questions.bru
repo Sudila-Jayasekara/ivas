@@ -6,7 +6,7 @@ meta {
 
 post {
   url: {{baseUrl}}/api/v1/assignments/:assignment_id/questions/generate
-  body: json
+  body: none
   auth: none
 }
 
@@ -14,19 +14,10 @@ params:path {
   assignment_id: {{assignment_id}}
 }
 
-headers {
-  Content-Type: application/json
-}
-
-body:json {
-  {
-    "num_questions_per_level": 1
-  }
-}
-
 docs {
   API 4 — Generate questions from saved grading criteria.
   Requires grading criteria to already exist for the assignment
   (run "Generate Grading Criteria" first).
-  num_questions_per_level: how many questions to generate per grading-criteria row.
+  Generates exactly one question per competency (one per grading-criteria row).
+  No request body required.
 }
