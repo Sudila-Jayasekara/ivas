@@ -1,6 +1,7 @@
 from app.services.llm_service import llm_service, LLMService
 from app.services.question_generator import QuestionGenerator, question_generator
 from app.services.question_service import QuestionService
+from app.services.grading_criteria_service import GradingCriteriaService
 from app.services.assessment_service import AssessmentService
 
 __all__ = [
@@ -9,5 +10,6 @@ __all__ = [
     "QuestionGenerator",
     "question_generator",
     "QuestionService",
+    "GradingCriteriaService",
     "AssessmentService",
 ]
