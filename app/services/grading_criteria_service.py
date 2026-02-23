@@ -117,25 +117,27 @@ class GradingCriteriaService:
 
     @staticmethod
     def _build_prompt(assignment_text: str) -> str:
-        return f"""You are an expert university lecturer. Analyse the following assignment text and extract grading criteria.
+        return f"""You are an expert university lecturer designing an ORAL VIVA assessment. Analyse the following assignment text and produce grading criteria that can ONLY be assessed through spoken conversation — no written answers, no live coding.
 
 ASSIGNMENT TEXT:
 \"\"\"
 {assignment_text}
 \"\"\"
 
-From the assignment text above, you must extract:
+From the assignment text above you must extract:
 1. The programming language used (e.g. "Python", "Java", "C++").
 2. A list of learning objectives the assignment addresses.
-3. A set of grading criteria covering different competencies and Bloom's taxonomy levels.
+3. A set of oral-viva grading criteria covering different competencies and Bloom's taxonomy levels.
+
+Each criterion must be designed so that an assessor can probe student understanding purely through verbal questions and conversation. Do NOT produce criteria that require the student to write code, run programs, or submit text. Everything must be testable by asking the student to EXPLAIN, JUSTIFY, DESCRIBE, or DISCUSS verbally.
 
 For each grading criterion provide:
-- competency: the skill or knowledge area (e.g. "Data Structures", "Error Handling")
-- difficulty_level: integer 1-5 (1=Remember, 2=Understand, 3=Apply, 4=Analyse, 5=Evaluate/Create)
+- competency: the skill or knowledge area being probed (e.g. "Data Structures", "Error Handling")
+- difficulty_level: integer 1-5 mapping to Bloom's taxonomy (1=Remember, 2=Understand, 3=Apply, 4=Analyse, 5=Evaluate/Create)
 - level_label: Bloom's taxonomy label (e.g. "Remember & Understand", "Apply", "Analyse", "Evaluate & Create")
-- level_description: what this level tests in the context of the assignment
-- marking_criteria: specific criteria for grading at this level
-- max_points: suggested point value (integer)
+- level_description: a set of 2-4 example VERBAL QUESTIONS the assessor will ask to probe this competency at this Bloom's level (e.g. "Can you explain why you chose X?", "What would happen if you changed Y?")
+- marking_criteria: specific observable indicators the assessor LISTENS FOR in the student's spoken response — what a full-mark answer sounds like versus a partial or poor answer
+- max_points: suggested point value for this criterion (integer)
 
 OUTPUT FORMAT (JSON only, no other text):
 {{
@@ -146,14 +148,14 @@ OUTPUT FORMAT (JSON only, no other text):
       "competency": "...",
       "difficulty_level": 1,
       "level_label": "...",
-      "level_description": "...",
-      "marking_criteria": "...",
+      "level_description": "Example viva questions: 'Can you describe...?' / 'What does X mean in your code?'",
+      "marking_criteria": "Full marks: student clearly explains... Partial: student mentions but cannot elaborate... No marks: student cannot answer.",
       "max_points": 10
     }}
   ]
 }}
 
-Return ONLY valid JSON. Generate a comprehensive set of criteria covering all competencies and difficulty levels relevant to the assignment.""".strip()
+Return ONLY valid JSON. Generate a comprehensive set of criteria covering all key competencies and all Bloom's levels relevant to the assignment, ensuring every criterion is assessable purely through verbal dialogue.""".strip()
 
     # ------------------------------------------------------------------
     # Parse
@@ -178,6 +180,10 @@ Return ONLY valid JSON. Generate a comprehensive set of criteria covering all co
             criteria: list[GradingCriteriaAI] = []
             for c in raw_criteria:
                 try:
+                    # LLM may return level_description as a list of viva questions;
+                    # join into a single string so the schema validation passes.
+                    if isinstance(c.get("level_description"), list):
+                        c["level_description"] = " / ".join(c["level_description"])
                     criteria.append(GradingCriteriaAI(**c))
                 except Exception as e:
                     logger.warning("Skipping invalid criterion: %s — %s", c, e)
