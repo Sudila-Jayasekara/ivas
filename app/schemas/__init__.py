@@ -7,7 +7,6 @@ from app.schemas.grading_criteria import (
     UpdateGradingCriteriaRequest,
 )
 from app.schemas.question import (
-    GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     GeneratedQuestionAI,
     QuestionOut,

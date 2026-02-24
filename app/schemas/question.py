@@ -6,7 +6,7 @@ Pydantic models for question generation (from grading criteria) and retrieval.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # --- AI generation (API 4) ---
@@ -18,10 +18,6 @@ class GeneratedQuestionAI(BaseModel):
     difficulty: int
     expected_answer: str
     max_points: int = 10
-
-
-class GenerateQuestionsRequest(BaseModel):
-    num_questions_per_level: int = Field(default=3, ge=1, le=20)
 
 
 class GenerateQuestionsResponse(BaseModel):

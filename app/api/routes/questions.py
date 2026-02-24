@@ -11,7 +11,6 @@ from typing import Optional
 
 from app.api.deps import get_question_service
 from app.schemas.question import (
-    GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     QuestionOut,
 )
@@ -29,11 +28,10 @@ router = APIRouter(tags=["questions"])
 )
 async def generate_questions(
     assignment_id: str,
-    req: GenerateQuestionsRequest,
     svc: QuestionService = Depends(get_question_service),
 ):
     try:
-        result = await svc.generate_questions(assignment_id, req)
+        result = await svc.generate_questions(assignment_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

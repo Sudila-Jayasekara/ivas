@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.question import Question
 from app.repositories.grading_criteria_repository import GradingCriteriaRepository
 from app.repositories.question_repository import QuestionRepository
-from app.schemas.question import GenerateQuestionsRequest
 from app.services.question_generator import question_generator
 
 logger = logging.getLogger(__name__)
@@ -28,14 +27,8 @@ class QuestionService:
     # Generate (API 4)
     # ------------------------------------------------------------------
 
-    async def generate_questions(
-        self, assignment_id: str, req: GenerateQuestionsRequest
-    ) -> dict:
-        logger.info(
-            "Starting question generation for assignment=%s num_per_level=%d",
-            assignment_id,
-            req.num_questions_per_level,
-        )
+    async def generate_questions(self, assignment_id: str) -> dict:
+        logger.info("Starting question generation for assignment=%s", assignment_id)
 
         # Fetch saved grading criteria
         criteria_rows = await self.criteria_repo.find_by_assignment_id(assignment_id)
@@ -61,7 +54,6 @@ class QuestionService:
 
         ai_questions = question_generator.generate_questions(
             criteria_rows=criteria_dicts,
-            num_questions_per_level=req.num_questions_per_level,
         )
 
         question_ids: list[str] = []

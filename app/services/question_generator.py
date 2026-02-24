@@ -47,13 +47,12 @@ class QuestionGenerator:
         marking_criteria: str,
         programming_language: str,
         learning_objectives: list[str],
-        num_questions: int,
     ) -> str:
         objectives = ", ".join(learning_objectives)
 
         return f"""You are an expert programming instructor creating oral viva questions.
 
-Generate {num_questions} unique viva voce questions for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
+Generate exactly 1 viva voce question for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
 
 CONTEXT:
 - Programming Language: {programming_language}
@@ -64,13 +63,13 @@ CONTEXT:
 - Learning Objectives: {objectives}
 
 RULES:
-1. Questions must be about "{competency}" specifically.
-2. Questions must test understanding at the "{level_label}" level.
-3. Questions must be answerable verbally (no code writing or diagrams).
-4. Each question difficulty must be exactly {difficulty_level}.
+1. The question must be about "{competency}" specifically.
+2. The question must test understanding at the "{level_label}" level.
+3. The question must be answerable verbally (no code writing or diagrams).
+4. Question difficulty must be exactly {difficulty_level}.
 5. Provide an expected answer summarising what a student should say.
 
-OUTPUT FORMAT (JSON array only, no other text):
+OUTPUT FORMAT (JSON array with exactly 1 item, no other text):
 [
   {{
     "question_text": "Your question here",
@@ -79,7 +78,7 @@ OUTPUT FORMAT (JSON array only, no other text):
   }}
 ]
 
-Generate exactly {num_questions} question(s). Return ONLY valid JSON array.""".strip()
+Return ONLY valid JSON array.""".strip()
 
     # ------------------------------------------------------------------
     # Parse
@@ -135,7 +134,6 @@ Generate exactly {num_questions} question(s). Return ONLY valid JSON array.""".s
         self,
         *,
         criteria_rows: list[dict],
-        num_questions_per_level: int,
     ) -> list[GeneratedQuestionAI]:
         """
         Parameters
@@ -144,8 +142,8 @@ Generate exactly {num_questions} question(s). Return ONLY valid JSON array.""".s
             Each dict must contain: competency, difficulty_level, level_label,
             level_description, marking_criteria, programming_language,
             learning_objectives.
-        num_questions_per_level : int
-            How many questions to generate per grading-criteria row.
+
+        Generates exactly one question per criteria row (one per competency).
         """
         all_questions: list[GeneratedQuestionAI] = []
 
@@ -153,8 +151,8 @@ Generate exactly {num_questions} question(s). Return ONLY valid JSON array.""".s
             competency = cr["competency"]
             difficulty = cr["difficulty_level"]
             logger.info(
-                "Generating %d questions for competency=%s difficulty=%d",
-                num_questions_per_level, competency, difficulty,
+                "Generating 1 question for competency=%s difficulty=%d",
+                competency, difficulty,
             )
 
             prompt = self._build_prompt(
@@ -165,7 +163,6 @@ Generate exactly {num_questions} question(s). Return ONLY valid JSON array.""".s
                 marking_criteria=cr["marking_criteria"],
                 programming_language=cr["programming_language"],
                 learning_objectives=cr["learning_objectives"],
-                num_questions=num_questions_per_level,
             )
 
             try:
@@ -179,10 +176,10 @@ Generate exactly {num_questions} question(s). Return ONLY valid JSON array.""".s
 
                 questions = self._parse_response(response_text, competency, difficulty)
 
-                if len(questions) < num_questions_per_level:
+                if not questions:
                     logger.warning(
-                        "Only generated %d/%d questions for %s@%d",
-                        len(questions), num_questions_per_level, competency, difficulty,
+                        "Failed to generate question for %s@%d",
+                        competency, difficulty,
                     )
 
                 all_questions.extend(questions)
