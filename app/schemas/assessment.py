@@ -50,6 +50,12 @@ class SubmitResponseResponse(BaseModel):
     next_question: QuestionWithContext | None = None
     is_complete: bool
     message: str = ""
+    evaluation_score: float | None = None
+    feedback_text: str | None = None
+    detected_misconceptions: list[str] | None = None
+    final_score: float | None = None
+    max_score: float | None = None
+    competency_summary: list[dict] | None = None
 
 
 # --- Session details ---
@@ -74,6 +80,9 @@ class StudentResponseOut(BaseModel):
     response_type: str | None = None
     submitted_at: datetime
     response_time_seconds: int
+    evaluation_score: float | None = None
+    feedback_text: str | None = None
+    detected_misconceptions: list[str] | None = None
     model_config = {"from_attributes": True}
 
 
@@ -86,6 +95,9 @@ class SessionOut(BaseModel):
     started_at: datetime
     completed_at: datetime | None = None
     code_context: str | None = None
+    final_score: float | None = None
+    max_score: float | None = None
+    competency_summary: list[dict] | None = None
     model_config = {"from_attributes": True}
 
 
@@ -132,6 +144,9 @@ class ExchangeOut(BaseModel):
     asked_at: datetime
     answered_at: datetime | None = None
     response_time_seconds: int = 0
+    evaluation_score: float | None = None
+    feedback_text: str | None = None
+    detected_misconceptions: list[str] | None = None
 
 
 class AssessmentTranscriptOut(BaseModel):
@@ -143,3 +158,6 @@ class AssessmentTranscriptOut(BaseModel):
     completed_at: datetime | None = None
     code_context: str = ""
     exchanges: list[ExchangeOut]
+    final_score: float | None = None
+    max_score: float | None = None
+    competency_summary: list[dict] | None = None
