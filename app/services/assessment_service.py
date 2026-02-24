@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.assessment import (
     AssessmentQuestionInstance,
     AssessmentSession,
+    ResponseCompetencyLink,
     StudentResponse,
 )
 from app.models.question import Question
@@ -38,6 +39,7 @@ from app.schemas.assessment import (
     TriggerAssessmentRequest,
     TriggerAssessmentResponse,
 )
+from app.services.evaluation_service import evaluation_service
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,79 @@ logger = logging.getLogger(__name__)
 class AssessmentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    # ------------------------------------------------------------------
+    # Score computation (called when session completes)
+    # ------------------------------------------------------------------
+
+    async def _compute_session_scores(
+        self, session_obj: AssessmentSession
+    ) -> None:
+        """Aggregate per-response scores into session-level final_score and competency_summary."""
+        result = await self.session.execute(
+            select(StudentResponse).where(
+                StudentResponse.session_id == session_obj.id
+            )
+        )
+        responses = list(result.scalars().all())
+
+        # Fetch question instances to map response → competency + max_points
+        inst_result = await self.session.execute(
+            select(AssessmentQuestionInstance).where(
+                AssessmentQuestionInstance.session_id == session_obj.id
+            )
+        )
+        instances = {i.id: i for i in inst_result.scalars().all()}
+
+        # Fetch questions for max_points
+        q_ids = [i.question_id for i in instances.values()]
+        if q_ids:
+            q_result = await self.session.execute(
+                select(Question).where(Question.id.in_(q_ids))
+            )
+            questions_map = {q.id: q for q in q_result.scalars().all()}
+        else:
+            questions_map = {}
+
+        # Build per-competency aggregation
+        competency_data: dict[str, dict] = {}  # comp -> {scored, max, count}
+        total_scored = 0.0
+        total_max = 0.0
+
+        for resp in responses:
+            inst = instances.get(resp.question_instance_id)
+            if not inst:
+                continue
+            comp = inst.competency or "General"
+            q = questions_map.get(inst.question_id)
+            max_pts = float(q.max_points) if q else 10.0
+            scored = float(resp.evaluation_score) if resp.evaluation_score is not None else 0.0
+
+            total_scored += scored
+            total_max += max_pts
+
+            if comp not in competency_data:
+                competency_data[comp] = {"scored": 0.0, "max": 0.0, "count": 0}
+            competency_data[comp]["scored"] += scored
+            competency_data[comp]["max"] += max_pts
+            competency_data[comp]["count"] += 1
+
+        session_obj.final_score = round(total_scored, 2)
+        session_obj.max_score = round(total_max, 2)
+
+        # competency_summary: list of {competency, scored, max, percentage}
+        summary = []
+        for comp, d in competency_data.items():
+            pct = round((d["scored"] / d["max"]) * 100, 1) if d["max"] > 0 else 0.0
+            summary.append({
+                "competency": comp,
+                "scored": round(d["scored"], 2),
+                "max": round(d["max"], 2),
+                "percentage": pct,
+                "questions_count": d["count"],
+            })
+        session_obj.competency_summary = summary
+        await self.session.flush()
 
     # ------------------------------------------------------------------
     # Trigger
@@ -173,6 +248,40 @@ class AssessmentService:
         self.session.add(resp)
         await self.session.flush()
 
+        # --- LLM Evaluation ---
+        question_result = await self.session.execute(
+            select(Question).where(Question.id == instance.question_id)
+        )
+        question_obj = question_result.scalar_one_or_none()
+
+        eval_result = None
+        if question_obj:
+            eval_result = evaluation_service.evaluate(
+                question_text=question_obj.question_text,
+                expected_answer=question_obj.expected_answer or "",
+                student_answer=response_text,
+                competency=instance.competency,
+                difficulty=instance.difficulty,
+                max_points=question_obj.max_points,
+                code_context=session_obj.code_context or "",
+            )
+            resp.evaluation_score = eval_result.score
+            resp.feedback_text = eval_result.feedback
+            resp.detected_misconceptions = eval_result.misconceptions
+            await self.session.flush()
+
+            # Populate response_competency_links
+            for comp, comp_score in eval_result.competency_scores.items():
+                link = ResponseCompetencyLink(
+                    id=str(uuid4()),
+                    response_id=resp.id,
+                    competency=comp,
+                    score=comp_score,
+                    question_id=instance.question_id,
+                )
+                self.session.add(link)
+            await self.session.flush()
+
         # Count asked questions
         count_result = await self.session.execute(
             select(func.count())
@@ -184,9 +293,18 @@ class AssessmentService:
         if asked_count >= 3:
             session_obj.status = "completed"
             session_obj.completed_at = now
+            await self._compute_session_scores(session_obj)
             await self.session.flush()
             return SubmitResponseResponse(
-                response_id=resp.id, is_complete=True, message="Assessment completed"
+                response_id=resp.id,
+                is_complete=True,
+                message="Assessment completed",
+                evaluation_score=resp.evaluation_score,
+                feedback_text=resp.feedback_text,
+                detected_misconceptions=resp.detected_misconceptions,
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
             )
 
         # Get already asked question IDs
@@ -213,11 +331,18 @@ class AssessmentService:
         if next_question is None:
             session_obj.status = "completed"
             session_obj.completed_at = now
+            await self._compute_session_scores(session_obj)
             await self.session.flush()
             return SubmitResponseResponse(
                 response_id=resp.id,
                 is_complete=True,
                 message="No more questions available. Assessment completed.",
+                evaluation_score=resp.evaluation_score,
+                feedback_text=resp.feedback_text,
+                detected_misconceptions=resp.detected_misconceptions,
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
             )
 
         new_instance_id = str(uuid4())
@@ -243,7 +368,12 @@ class AssessmentService:
         )
 
         return SubmitResponseResponse(
-            response_id=resp.id, next_question=next_ctx, is_complete=False
+            response_id=resp.id,
+            next_question=next_ctx,
+            is_complete=False,
+            evaluation_score=resp.evaluation_score,
+            feedback_text=resp.feedback_text,
+            detected_misconceptions=resp.detected_misconceptions,
         )
 
     # ------------------------------------------------------------------
@@ -444,6 +574,9 @@ class AssessmentService:
                 exchange.student_answer = resp.response_text
                 exchange.answered_at = resp.submitted_at
                 exchange.response_time_seconds = resp.response_time_seconds
+                exchange.evaluation_score = resp.evaluation_score
+                exchange.feedback_text = resp.feedback_text
+                exchange.detected_misconceptions = resp.detected_misconceptions
 
             exchanges.append(exchange)
 
@@ -456,4 +589,7 @@ class AssessmentService:
             completed_at=session_obj.completed_at,
             code_context=session_obj.code_context or "",
             exchanges=exchanges,
+            final_score=session_obj.final_score,
+            max_score=session_obj.max_score,
+            competency_summary=session_obj.competency_summary,
         )
