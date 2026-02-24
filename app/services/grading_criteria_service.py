@@ -8,6 +8,7 @@ API 2: Lecturer reviews the criteria.
 API 3: Lecturer edits individual criteria rows.
 """
 
+import asyncio
 import json
 import logging
 
@@ -37,8 +38,9 @@ class GradingCriteriaService:
         prompt = self._build_prompt(assignment_text)
 
         try:
-            response_text = llm_service.generate(
-                prompt=prompt,
+            response_text = await asyncio.to_thread(
+                llm_service.generate,
+                prompt,
                 temperature=0.4,
                 num_predict=4000,
                 max_output_tokens=4000,
