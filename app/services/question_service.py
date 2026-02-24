@@ -5,6 +5,7 @@ Business logic for question generation (API 4) and retrieval (API 5).
 Questions are generated from saved GradingCriteria rows via the QuestionGenerator (LLM).
 """
 
+import asyncio
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +53,8 @@ class QuestionService:
             for c in criteria_rows
         ]
 
-        ai_questions = question_generator.generate_questions(
+        ai_questions = await asyncio.to_thread(
+            question_generator.generate_questions,
             criteria_rows=criteria_dicts,
         )
 
