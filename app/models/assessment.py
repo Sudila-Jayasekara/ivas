@@ -22,7 +22,6 @@ class AssessmentSession(Base):
     id: Mapped[str] = mapped_column(PG_UUID(as_uuid=False), primary_key=True)
     student_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     assignment_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    task_id: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     trigger_reason: Mapped[str] = mapped_column(String, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

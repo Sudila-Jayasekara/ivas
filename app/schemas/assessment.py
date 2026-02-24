@@ -27,9 +27,7 @@ class QuestionWithContext(BaseModel):
 class TriggerAssessmentRequest(BaseModel):
     student_id: str
     assignment_id: str
-    task_id: str
     code_context: str = ""
-    competencies: list[str] = []
 
 
 class TriggerAssessmentResponse(BaseModel):
@@ -83,7 +81,6 @@ class SessionOut(BaseModel):
     id: str
     student_id: str
     assignment_id: str
-    task_id: str
     status: str
     trigger_reason: str
     started_at: datetime
@@ -118,7 +115,6 @@ class InstructorAssessmentSummary(BaseModel):
     session_id: str
     student_id: str
     assignment_id: str
-    task_id: str
     status: str
     started_at: datetime
     completed_at: datetime | None = None

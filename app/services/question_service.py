@@ -67,7 +67,7 @@ class QuestionService:
                 difficulty=q.difficulty,
                 expected_answer=q.expected_answer,
                 max_points=q.max_points,
-                status="draft",
+                status="approved",
             )
             try:
                 question = await self.question_repo.create(question)

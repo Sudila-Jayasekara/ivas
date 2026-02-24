@@ -134,23 +134,3 @@ async def get_student_progress(student_id: str):
         "competency_scores": {"loops": 0.8, "arrays": 0.6, "recursion": 0.2},
         "previous_attempts": 3,
     }
-
-
-# ---------- lab tasks ----------
-
-@router.get("/lab-tasks/{task_id}")
-async def get_lab_task(task_id: str):
-    return {
-        "student_id": "student-123",
-        "assignment_id": "assignment-456",
-        "task_id": task_id,
-        "course_id": "course-789",
-        "completion_time": datetime.utcnow().isoformat(),
-        "code_submitted": 'def main():\n    print("Hello")',
-        "competencies": ["loops", "arrays"],
-    }
-
-
-@router.post("/lab-tasks/complete")
-async def complete_lab_task():
-    return {"status": "completed", "message": "Task completion recorded"}
