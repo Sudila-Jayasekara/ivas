@@ -9,8 +9,8 @@ to read and write data.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -22,7 +22,6 @@ class AssessmentSession(Base):
     id: Mapped[str] = mapped_column(PG_UUID(as_uuid=False), primary_key=True)
     student_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     assignment_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    task_id: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     trigger_reason: Mapped[str] = mapped_column(String, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -30,6 +29,11 @@ class AssessmentSession(Base):
         DateTime(timezone=True), nullable=True
     )
     code_context: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Computed on session completion ---
+    final_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    max_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    competency_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 class AssessmentQuestionInstance(Base):
     __tablename__ = "assessment_question_instances"
@@ -78,6 +82,11 @@ class StudentResponse(Base):
     )
     response_time_seconds: Mapped[int] = mapped_column(Integer, default=0)
 
+    # --- Evaluation fields (populated by LLM after submission) ---
+    evaluation_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    feedback_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    detected_misconceptions: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
 
 class ResponseCompetencyLink(Base):
     __tablename__ = "response_competency_links"
@@ -90,4 +99,5 @@ class ResponseCompetencyLink(Base):
         index=True,
     )
     competency: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
     question_id: Mapped[str] = mapped_column(String, nullable=False)
