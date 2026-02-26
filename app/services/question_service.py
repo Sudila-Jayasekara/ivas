@@ -28,8 +28,16 @@ class QuestionService:
     # Generate (API 4)
     # ------------------------------------------------------------------
 
-    async def generate_questions(self, assignment_id: str) -> dict:
-        logger.info("Starting question generation for assignment=%s", assignment_id)
+    async def generate_questions(
+        self, assignment_id: str, criteria_id: str | None = None
+    ) -> dict:
+        """Generate questions from grading criteria.
+
+        If criteria_id is provided, generate only for that specific criterion.
+        Otherwise, generate for all criteria that don't have questions yet.
+        Running again always adds more questions (never deletes existing).
+        """
+        logger.info("Starting question generation for assignment=%s criteria=%s", assignment_id, criteria_id)
 
         # Fetch saved grading criteria
         criteria_rows = await self.criteria_repo.find_by_assignment_id(assignment_id)
@@ -39,9 +47,24 @@ class QuestionService:
                 "Generate grading criteria first (POST /assignments/{id}/grading-criteria/generate)."
             )
 
+        if criteria_id:
+            # Generate for a specific criterion only
+            criteria_rows = [c for c in criteria_rows if c.id == criteria_id]
+            if not criteria_rows:
+                raise ValueError(f"Grading criteria {criteria_id} not found for this assignment.")
+        else:
+            # Find criteria that already have questions and skip them
+            existing_questions = await self.question_repo.find_by_assignment_id(assignment_id)
+            criteria_with_questions = {q.grading_criteria_id for q in existing_questions if q.grading_criteria_id}
+            new_criteria = [c for c in criteria_rows if c.id not in criteria_with_questions]
+            if new_criteria:
+                criteria_rows = new_criteria
+            # If all criteria have questions, generate anyway (adds more questions)
+
         # Convert ORM rows to dicts for the generator
         criteria_dicts = [
             {
+                "criteria_id": c.id,
                 "competency": c.competency,
                 "difficulty_level": c.difficulty_level,
                 "level_label": c.level_label,
@@ -49,6 +72,7 @@ class QuestionService:
                 "marking_criteria": c.marking_criteria,
                 "programming_language": c.programming_language,
                 "learning_objectives": c.learning_objectives,
+                "max_points": c.max_points,
             }
             for c in criteria_rows
         ]
@@ -62,6 +86,7 @@ class QuestionService:
         for q in ai_questions:
             question = Question(
                 assignment_id=assignment_id,
+                grading_criteria_id=q.grading_criteria_id,
                 question_text=q.question_text,
                 competency=q.competency,
                 difficulty=q.difficulty,

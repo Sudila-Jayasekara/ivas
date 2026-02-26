@@ -47,6 +47,7 @@ class QuestionGenerator:
         marking_criteria: str,
         programming_language: str,
         learning_objectives: list[str],
+        max_points: int = 10,
     ) -> str:
         objectives = ", ".join(learning_objectives)
 
@@ -61,6 +62,7 @@ CONTEXT:
 - Level Description: {level_description}
 - Marking Criteria: {marking_criteria}
 - Learning Objectives: {objectives}
+- Maximum Points: {max_points}
 
 RULES:
 1. The question must be about "{competency}" specifically.
@@ -68,13 +70,14 @@ RULES:
 3. The question must be answerable verbally (no code writing or diagrams).
 4. Question difficulty must be exactly {difficulty_level}.
 5. Provide an expected answer summarising what a student should say.
+6. max_points MUST be exactly {max_points}.
 
 OUTPUT FORMAT (JSON array with exactly 1 item, no other text):
 [
   {{
     "question_text": "Your question here",
     "expected_answer": "Expected student response covering key points...",
-    "max_points": 10
+    "max_points": {max_points}
   }}
 ]
 
@@ -141,7 +144,7 @@ Return ONLY valid JSON array.""".strip()
         criteria_rows : list[dict]
             Each dict must contain: competency, difficulty_level, level_label,
             level_description, marking_criteria, programming_language,
-            learning_objectives.
+            learning_objectives, max_points.  Optionally: criteria_id.
 
         Generates exactly one question per criteria row (one per competency).
         """
@@ -150,9 +153,11 @@ Return ONLY valid JSON array.""".strip()
         for cr in criteria_rows:
             competency = cr["competency"]
             difficulty = cr["difficulty_level"]
+            max_points = cr.get("max_points", 10)
+            criteria_id = cr.get("criteria_id")
             logger.info(
-                "Generating 1 question for competency=%s difficulty=%d",
-                competency, difficulty,
+                "Generating 1 question for competency=%s difficulty=%d max_points=%d",
+                competency, difficulty, max_points,
             )
 
             prompt = self._build_prompt(
@@ -163,6 +168,7 @@ Return ONLY valid JSON array.""".strip()
                 marking_criteria=cr["marking_criteria"],
                 programming_language=cr["programming_language"],
                 learning_objectives=cr["learning_objectives"],
+                max_points=max_points,
             )
 
             try:
@@ -175,6 +181,12 @@ Return ONLY valid JSON array.""".strip()
                 )
 
                 questions = self._parse_response(response_text, competency, difficulty)
+
+                # Attach criteria_id and enforce max_points from criteria
+                for q in questions:
+                    q.max_points = max_points
+                    if criteria_id:
+                        q.grading_criteria_id = criteria_id
 
                 if not questions:
                     logger.warning(

@@ -18,6 +18,7 @@ class GeneratedQuestionAI(BaseModel):
     difficulty: int
     expected_answer: str
     max_points: int = 10
+    grading_criteria_id: str | None = None
 
 
 class GenerateQuestionsResponse(BaseModel):
@@ -31,6 +32,7 @@ class GenerateQuestionsResponse(BaseModel):
 class QuestionOut(BaseModel):
     id: str
     assignment_id: str
+    grading_criteria_id: str | None = None
     question_text: str
     competency: str
     difficulty: int
