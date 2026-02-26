@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Integer,
     String,
     Text,
@@ -30,6 +31,12 @@ class Question(Base):
         server_default=func.gen_random_uuid(),
     )
     assignment_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    grading_criteria_id: Mapped[str | None] = mapped_column(
+        PG_UUID(as_uuid=False),
+        ForeignKey("grading_criteria.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     competency: Mapped[str] = mapped_column(String, nullable=False, index=True)
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False)
