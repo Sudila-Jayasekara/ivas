@@ -22,6 +22,10 @@ class EvaluationResult:
     competency_scores: dict[str, float]  # competency -> score
 
 
+# Fixed max points for all questions — ensures fairness
+MAX_POINTS = 10
+
+
 class EvaluationService:
     """Sends student response + question context to LLM for evaluation."""
 
@@ -66,7 +70,7 @@ OUTPUT FORMAT (JSON object only, no other text):
 Return ONLY valid JSON.""".strip()
 
     @staticmethod
-    def _parse_response(raw: str, competency: str, max_points: int) -> EvaluationResult:
+    def _parse_response(raw: str, competency: str, max_points: int = MAX_POINTS) -> EvaluationResult:
         """Parse LLM JSON response into EvaluationResult."""
         try:
             text = raw.strip()
@@ -119,7 +123,7 @@ Return ONLY valid JSON.""".strip()
         student_answer: str,
         competency: str,
         difficulty: int,
-        max_points: int = 10,
+        max_points: int = MAX_POINTS,
         code_context: str = "",
     ) -> EvaluationResult:
         """Evaluate a single student response via LLM. Synchronous (LLM call is sync)."""
