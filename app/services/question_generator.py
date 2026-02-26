@@ -47,7 +47,6 @@ class QuestionGenerator:
         marking_criteria: str,
         programming_language: str,
         learning_objectives: list[str],
-        max_points: int = 10,
     ) -> str:
         objectives = ", ".join(learning_objectives)
 
@@ -62,22 +61,61 @@ CONTEXT:
 - Level Description: {level_description}
 - Marking Criteria: {marking_criteria}
 - Learning Objectives: {objectives}
-- Maximum Points: {max_points}
 
-RULES:
-1. The question must be about "{competency}" specifically.
-2. The question must test understanding at the "{level_label}" level.
+═══════════════════════════════════════════════════════════════
+BLOOM'S TAXONOMY — MANDATORY QUESTION DESIGN RULES
+═══════════════════════════════════════════════════════════════
+
+The question MUST match the Bloom's level "{level_label}" (difficulty {difficulty_level}).
+Follow these rules STRICTLY:
+
+Level 1 — "Remember":
+  → Ask the student to RECALL, DEFINE, LIST, NAME, or STATE facts/terms.
+  → Questions should test memorisation of syntax, definitions, or terminology.
+  → Do NOT ask "why" or "how" — only "what".
+  → Example: "What is the syntax for declaring a struct in C++?"
+
+Level 2 — "Understand":
+  → Ask the student to EXPLAIN, DESCRIBE, SUMMARISE, COMPARE, or CONTRAST concepts.
+  → The student must demonstrate comprehension IN THEIR OWN WORDS.
+  → Do NOT present a new scenario to solve — that is Apply level.
+  → Do NOT ask them to walk through steps — that is Apply level.
+  → Example: "Explain why using functions improves code readability."
+
+Level 3 — "Apply":
+  → Present a SPECIFIC CONCRETE SCENARIO and ask the student to walk through
+    how they would SOLVE, USE, IMPLEMENT, or CALCULATE using their knowledge.
+  → The question MUST contain a scenario (e.g., "Given X...", "Imagine you have...").
+  → The student must demonstrate they can USE their knowledge in a new situation.
+  → Example: "Given a rectangle with length 5.5 and width 3.2, walk me through
+    how your function would calculate and display the perimeter."
+
+Level 4 — "Analyse":
+  → Ask the student to ANALYSE, COMPARE alternatives, find TRADE-OFFS, or
+    DIFFERENTIATE between approaches with reasoning.
+  → The question MUST ask WHY one approach is better/worse or what the
+    TRADE-OFFS are between alternatives.
+  → Example: "Compare using pass-by-reference vs pass-by-value for this function.
+    What are the trade-offs in terms of memory and side effects?"
+
+Level 5 — "Evaluate & Create":
+  → Ask the student to EVALUATE, JUSTIFY, CRITIQUE, DESIGN, or PROPOSE solutions.
+  → The question MUST require critical thinking, judgment, or designing a new approach.
+  → Example: "Critique your error handling approach. What weaknesses does it have,
+    and how would you redesign it for a production system?"
+
+CRITICAL RULES:
+1. The question MUST be about "{competency}" specifically.
+2. The question MUST use the action verbs for "{level_label}" level ONLY.
 3. The question must be answerable verbally (no code writing or diagrams).
-4. Question difficulty must be exactly {difficulty_level}.
-5. Provide an expected answer summarising what a student should say.
-6. max_points MUST be exactly {max_points}.
+4. The expected_answer must describe what a strong student would say at this Bloom's level.
+5. All questions are scored out of 10 points — do NOT include max_points in output.
 
 OUTPUT FORMAT (JSON array with exactly 1 item, no other text):
 [
   {{
     "question_text": "Your question here",
-    "expected_answer": "Expected student response covering key points...",
-    "max_points": {max_points}
+    "expected_answer": "Expected student response covering key points..."
   }}
 ]
 
@@ -116,7 +154,7 @@ Return ONLY valid JSON array.""".strip()
                         competency=competency,
                         difficulty=difficulty,
                         expected_answer=q.get("expected_answer", ""),
-                        max_points=q.get("max_points", 10),
+                        max_points=10,
                     )
                 )
 
@@ -153,11 +191,10 @@ Return ONLY valid JSON array.""".strip()
         for cr in criteria_rows:
             competency = cr["competency"]
             difficulty = cr["difficulty_level"]
-            max_points = cr.get("max_points", 10)
             criteria_id = cr.get("criteria_id")
             logger.info(
-                "Generating 1 question for competency=%s difficulty=%d max_points=%d",
-                competency, difficulty, max_points,
+                "Generating 1 question for competency=%s difficulty=%d",
+                competency, difficulty,
             )
 
             prompt = self._build_prompt(
@@ -168,7 +205,6 @@ Return ONLY valid JSON array.""".strip()
                 marking_criteria=cr["marking_criteria"],
                 programming_language=cr["programming_language"],
                 learning_objectives=cr["learning_objectives"],
-                max_points=max_points,
             )
 
             try:
@@ -182,9 +218,9 @@ Return ONLY valid JSON array.""".strip()
 
                 questions = self._parse_response(response_text, competency, difficulty)
 
-                # Attach criteria_id and enforce max_points from criteria
+                # Attach criteria_id; max_points is always 10
                 for q in questions:
-                    q.max_points = max_points
+                    q.max_points = 10
                     if criteria_id:
                         q.grading_criteria_id = criteria_id
 
