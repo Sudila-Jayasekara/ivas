@@ -37,7 +37,6 @@ class GradingCriteria(Base):
     level_label: Mapped[str] = mapped_column(String, nullable=False)
     level_description: Mapped[str] = mapped_column(Text, nullable=False)
     marking_criteria: Mapped[str] = mapped_column(Text, nullable=False)
-    max_points: Mapped[int] = mapped_column(Integer, nullable=False)
     programming_language: Mapped[str] = mapped_column(String, nullable=False)
     learning_objectives: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False

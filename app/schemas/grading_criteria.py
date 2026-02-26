@@ -24,7 +24,6 @@ class GradingCriteriaAI(BaseModel):
     level_label: str
     level_description: str
     marking_criteria: str
-    max_points: int
 
 
 class GenerateGradingCriteriaResponse(BaseModel):
@@ -43,7 +42,6 @@ class GradingCriteriaOut(BaseModel):
     level_label: str
     level_description: str
     marking_criteria: str
-    max_points: int
     programming_language: str
     learning_objectives: list[str]
     created_at: datetime
@@ -58,6 +56,5 @@ class UpdateGradingCriteriaRequest(BaseModel):
     level_label: Optional[str] = None
     level_description: Optional[str] = None
     marking_criteria: Optional[str] = None
-    max_points: Optional[int] = None
     programming_language: Optional[str] = None
     learning_objectives: Optional[list[str]] = None

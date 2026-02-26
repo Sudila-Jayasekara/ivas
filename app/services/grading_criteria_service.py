@@ -80,7 +80,6 @@ class GradingCriteriaService:
                 level_label=item.level_label,
                 level_description=item.level_description,
                 marking_criteria=item.marking_criteria,
-                max_points=item.max_points,
                 programming_language=programming_language,
                 learning_objectives=learning_objectives,
             )
@@ -143,31 +142,90 @@ From the assignment text above you must extract:
 
 Each criterion must be designed so that an assessor can probe student understanding purely through verbal questions and conversation. Do NOT produce criteria that require the student to write code, run programs, or submit text. Everything must be testable by asking the student to EXPLAIN, JUSTIFY, DESCRIBE, or DISCUSS verbally.
 
+═══════════════════════════════════════════════════════════════
+BLOOM'S TAXONOMY — MANDATORY RULES (follow these EXACTLY)
+═══════════════════════════════════════════════════════════════
+
+You MUST map each criterion to ONE of the following Bloom's levels.
+Use the EXACT difficulty_level integer AND the EXACT level_label string shown below.
+Use ONLY the action verbs listed for that level — both in level_description and marking_criteria.
+
+┌─────────────────┬────────────────────┬──────────────────────────────────────────────────────────────────┐
+│ difficulty_level │ level_label        │ Permitted action verbs & what to assess                         │
+├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
+│ 1               │ "Remember"         │ DEFINE, LIST, RECALL, NAME, IDENTIFY, STATE                     │
+│                 │                    │ Student recalls facts, terms, definitions from memory.           │
+│                 │                    │ Example Q: "Can you list the data types in C++?"                 │
+│                 │                    │ Example Q: "What is the syntax for declaring a function?"        │
+├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
+│ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE, PARAPHRASE, COMPARE, CONTRAST     │
+│                 │                    │ Student demonstrates comprehension by explaining concepts        │
+│                 │                    │ IN THEIR OWN WORDS. No application to new scenarios.             │
+│                 │                    │ Example Q: "Explain why functions are useful in programming."     │
+│                 │                    │ Example Q: "Describe the difference between pass-by-value and    │
+│                 │                    │  pass-by-reference."                                             │
+├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
+│ 3               │ "Apply"            │ DEMONSTRATE, SOLVE, USE, IMPLEMENT (verbally), CALCULATE        │
+│                 │                    │ Student applies knowledge to a SPECIFIC NEW SCENARIO verbally.   │
+│                 │                    │ The question MUST present a concrete scenario and ask the        │
+│                 │                    │ student to walk through their approach step-by-step.             │
+│                 │                    │ Example Q: "Given a radius of 5, walk me through how your        │
+│                 │                    │  function calculates the area."                                  │
+│                 │                    │ Example Q: "If the user enters -3 as input, what would happen    │
+│                 │                    │  in your program and how would you handle it?"                   │
+├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
+│ 4               │ "Analyse"          │ ANALYSE, DIFFERENTIATE, COMPARE, CONTRAST, EXAMINE, DECONSTRUCT │
+│                 │                    │ Student breaks down a problem into parts, identifies             │
+│                 │                    │ relationships, or compares alternatives with reasoning.          │
+│                 │                    │ The question MUST ask WHY or HOW alternatives differ.            │
+│                 │                    │ Example Q: "Why did you use pass-by-reference here instead of    │
+│                 │                    │  pass-by-value? What would change if you switched?"              │
+│                 │                    │ Example Q: "Compare using a single monolithic function vs.       │
+│                 │                    │  decomposing into multiple functions. What are the trade-offs?"  │
+├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
+│ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, CRITIQUE, DESIGN, PROPOSE, HYPOTHESISE      │
+│                 │                    │ Student makes judgements, defends design decisions, or           │
+│                 │                    │ proposes new solutions to complex/novel situations.              │
+│                 │                    │ The question MUST require critical thinking and justification.   │
+│                 │                    │ Example Q: "If you had to redesign this program to handle 1000   │
+│                 │                    │  shapes, what would you change and why?"                         │
+│                 │                    │ Example Q: "Critique your error handling strategy. What are its  │
+│                 │                    │  weaknesses and how would you improve it?"                       │
+└─────────────────┴────────────────────┴──────────────────────────────────────────────────────────────────┘
+
+IMPORTANT CONSTRAINTS:
+- Every criterion's level_description must contain 2-4 example VERBAL QUESTIONS using ONLY the action verbs for that level.
+- Do NOT use "Describe" or "Explain" verbs in Apply/Analyse/Evaluate levels — those belong to Understand.
+- Do NOT use "Walk me through" or scenario-based questions at the Understand level — those belong to Apply.
+- The marking_criteria must describe what assessors LISTEN FOR at the specific Bloom's level, not generic pass/fail.
+- Generate a good spread across difficulty levels (aim for at least 2-3 different levels).
+- Every criterion must be assessable purely through verbal dialogue.
+
 For each grading criterion provide:
-- competency: the skill or knowledge area being probed (e.g. "Data Structures", "Error Handling")
-- difficulty_level: integer 1-5 mapping to Bloom's taxonomy (1=Remember, 2=Understand, 3=Apply, 4=Analyse, 5=Evaluate/Create)
-- level_label: Bloom's taxonomy label (e.g. "Remember & Understand", "Apply", "Analyse", "Evaluate & Create")
-- level_description: a set of 2-4 example VERBAL QUESTIONS the assessor will ask to probe this competency at this Bloom's level (e.g. "Can you explain why you chose X?", "What would happen if you changed Y?")
-- marking_criteria: specific observable indicators the assessor LISTENS FOR in the student's spoken response — what a full-mark answer sounds like versus a partial or poor answer
-- max_points: suggested point value for this criterion (integer)
+- competency: the skill or knowledge area being probed
+- difficulty_level: integer 1-5 as per the table above
+- level_label: EXACT string from the table above
+- level_description: 2-4 example VERBAL QUESTIONS using the correct Bloom's verbs
+- marking_criteria: specific observable indicators the assessor LISTENS FOR
+
+NOTE: All questions are scored out of a FIXED 10 points. Do NOT include max_points in criteria.
 
 OUTPUT FORMAT (JSON only, no other text):
 {{
-  "programming_language": "Python",
+  "programming_language": "C++",
   "learning_objectives": ["objective 1", "objective 2"],
   "criteria": [
     {{
       "competency": "...",
-      "difficulty_level": 1,
-      "level_label": "...",
-      "level_description": "Example viva questions: 'Can you describe...?' / 'What does X mean in your code?'",
-      "marking_criteria": "Full marks: student clearly explains... Partial: student mentions but cannot elaborate... No marks: student cannot answer.",
-      "max_points": 10
+      "difficulty_level": 2,
+      "level_label": "Understand",
+      "level_description": "Explain why ... / Describe how ... / Summarise ...",
+      "marking_criteria": "Full marks: student clearly explains... Partial: student mentions but cannot elaborate... No marks: student cannot answer."
     }}
   ]
 }}
 
-Return ONLY valid JSON. Generate a comprehensive set of criteria covering all key competencies and all Bloom's levels relevant to the assignment, ensuring every criterion is assessable purely through verbal dialogue.""".strip()
+Return ONLY valid JSON. Generate a comprehensive set of criteria covering all key competencies and multiple Bloom's levels relevant to the assignment.""".strip()
 
     # ------------------------------------------------------------------
     # Parse
@@ -190,8 +248,15 @@ Return ONLY valid JSON. Generate a comprehensive set of criteria covering all ke
             raw_criteria = data.get("criteria", [])
 
             criteria: list[GradingCriteriaAI] = []
-            # Points scale: harder questions are worth more
-            DIFFICULTY_POINTS = {1: 4, 2: 6, 3: 8, 4: 10, 5: 12}
+
+            # Valid Bloom's level labels — enforce consistency
+            VALID_LABELS = {
+                1: "Remember",
+                2: "Understand",
+                3: "Apply",
+                4: "Analyse",
+                5: "Evaluate & Create",
+            }
 
             for c in raw_criteria:
                 try:
@@ -199,9 +264,11 @@ Return ONLY valid JSON. Generate a comprehensive set of criteria covering all ke
                     # join into a single string so the schema validation passes.
                     if isinstance(c.get("level_description"), list):
                         c["level_description"] = " / ".join(c["level_description"])
-                    # Enforce points based on difficulty — ignore LLM's arbitrary value
+                    # Enforce correct Bloom's level_label based on difficulty_level
                     difficulty = c.get("difficulty_level", 1)
-                    c["max_points"] = DIFFICULTY_POINTS.get(difficulty, 8)
+                    c["level_label"] = VALID_LABELS.get(difficulty, "Understand")
+                    # Remove max_points if LLM included it — it's always fixed at 10
+                    c.pop("max_points", None)
                     criteria.append(GradingCriteriaAI(**c))
                 except Exception as e:
                     logger.warning("Skipping invalid criterion: %s — %s", c, e)
