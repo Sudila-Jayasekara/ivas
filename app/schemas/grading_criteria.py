@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 class GenerateGradingCriteriaRequest(BaseModel):
     assignment_text: str = Field(..., min_length=1)
+    replace_existing: bool = Field(default=False, description="If true, deletes all existing criteria before generating. If false, appends new criteria (skipping duplicates).")
 
 
 class GradingCriteriaAI(BaseModel):
