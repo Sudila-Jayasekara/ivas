@@ -87,12 +87,33 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+    # 4. Run one-time schema migrations (drop removed columns, fix data)
+    await _run_schema_migrations()
+
     logger.info(
         "Database ready: %s:%s/%s (tables auto-migrated)",
         settings.db_host,
         settings.db_port,
         settings.db_name,
     )
+
+
+async def _run_schema_migrations() -> None:
+    """Run one-time schema migrations that create_all cannot handle (e.g. dropping columns)."""
+    assert engine is not None
+    async with engine.begin() as conn:
+        # Migration: Remove max_points from grading_criteria (now fixed at 10 for all questions)
+        result = await conn.execute(text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'grading_criteria' AND column_name = 'max_points'"
+        ))
+        if result.fetchone():
+            await conn.execute(text("ALTER TABLE grading_criteria DROP COLUMN max_points"))
+            logger.info("Migration: dropped max_points column from grading_criteria")
+
+        # Migration: Set all existing questions to max_points=10
+        await conn.execute(text("UPDATE questions SET max_points = 10 WHERE max_points != 10"))
+        logger.debug("Migration: normalised questions.max_points to 10")
 
 
 async def close_db() -> None:
