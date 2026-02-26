@@ -28,10 +28,11 @@ router = APIRouter(tags=["questions"])
 )
 async def generate_questions(
     assignment_id: str,
+    criteria_id: Optional[str] = Query(None, description="Generate questions for a specific grading criterion only"),
     svc: QuestionService = Depends(get_question_service),
 ):
     try:
-        result = await svc.generate_questions(assignment_id)
+        result = await svc.generate_questions(assignment_id, criteria_id=criteria_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
