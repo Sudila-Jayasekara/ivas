@@ -72,7 +72,6 @@ class QuestionService:
                 "marking_criteria": c.marking_criteria,
                 "programming_language": c.programming_language,
                 "learning_objectives": c.learning_objectives,
-                "max_points": c.max_points,
             }
             for c in criteria_rows
         ]
