@@ -31,9 +31,9 @@ class GradingCriteriaService:
     # Generate (API 1)
     # ------------------------------------------------------------------
 
-    async def generate(self, assignment_id: str, assignment_text: str) -> dict:
+    async def generate(self, assignment_id: str, assignment_text: str, replace_existing: bool = False) -> dict:
         """Send assignment text to AI, parse response, persist criteria rows."""
-        logger.info("Generating grading criteria for assignment=%s", assignment_id)
+        logger.info("Generating grading criteria for assignment=%s (replace=%s)", assignment_id, replace_existing)
 
         prompt = self._build_prompt(assignment_text)
 
@@ -58,8 +58,18 @@ class GradingCriteriaService:
         learning_objectives = parsed["learning_objectives"]
         criteria_items: list[GradingCriteriaAI] = parsed["criteria"]
 
-        # Clear previous criteria for this assignment (regenerate)
-        await self.repo.delete_by_assignment_id(assignment_id)
+        if replace_existing:
+            await self.repo.delete_by_assignment_id(assignment_id)
+        else:
+            # Find existing competency+difficulty combos to skip duplicates
+            existing = await self.repo.find_by_assignment_id(assignment_id)
+            existing_keys = {
+                (c.competency, c.difficulty_level) for c in existing
+            }
+            criteria_items = [
+                item for item in criteria_items
+                if (item.competency, item.difficulty_level) not in existing_keys
+            ]
 
         criteria_ids: list[str] = []
         for item in criteria_items:
@@ -180,12 +190,18 @@ Return ONLY valid JSON. Generate a comprehensive set of criteria covering all ke
             raw_criteria = data.get("criteria", [])
 
             criteria: list[GradingCriteriaAI] = []
+            # Points scale: harder questions are worth more
+            DIFFICULTY_POINTS = {1: 4, 2: 6, 3: 8, 4: 10, 5: 12}
+
             for c in raw_criteria:
                 try:
                     # LLM may return level_description as a list of viva questions;
                     # join into a single string so the schema validation passes.
                     if isinstance(c.get("level_description"), list):
                         c["level_description"] = " / ".join(c["level_description"])
+                    # Enforce points based on difficulty — ignore LLM's arbitrary value
+                    difficulty = c.get("difficulty_level", 1)
+                    c["max_points"] = DIFFICULTY_POINTS.get(difficulty, 8)
                     criteria.append(GradingCriteriaAI(**c))
                 except Exception as e:
                     logger.warning("Skipping invalid criterion: %s — %s", c, e)
