@@ -10,6 +10,7 @@ questions and evaluating answers. This service:
 4. Returns session transcripts for instructors.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -263,7 +264,8 @@ class AssessmentService:
 
         eval_result = None
         if question_obj:
-            eval_result = evaluation_service.evaluate(
+            eval_result = await asyncio.to_thread(
+                evaluation_service.evaluate,
                 question_text=asked_text,
                 expected_answer=question_obj.expected_answer or "",
                 student_answer=response_text,
@@ -313,7 +315,8 @@ class AssessmentService:
         )
 
         if should_follow_up:
-            follow_up_text = evaluation_service.generate_follow_up(
+            follow_up_text = await asyncio.to_thread(
+                evaluation_service.generate_follow_up,
                 question_text=asked_text,
                 student_answer=response_text,
                 feedback=eval_result.feedback,
