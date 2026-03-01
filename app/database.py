@@ -115,6 +115,23 @@ async def _run_schema_migrations() -> None:
         await conn.execute(text("UPDATE questions SET max_points = 10 WHERE max_points != 10"))
         logger.debug("Migration: normalised questions.max_points to 10")
 
+        # Migration: Add Socratic follow-up columns to assessment_question_instances
+        for col, col_def in [
+            ("follow_up_depth", "INTEGER NOT NULL DEFAULT 0"),
+            ("parent_instance_id", "UUID"),
+            ("follow_up_question_text", "TEXT"),
+        ]:
+            chk = await conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'assessment_question_instances' "
+                f"AND column_name = '{col}'"
+            ))
+            if not chk.fetchone():
+                await conn.execute(text(
+                    f"ALTER TABLE assessment_question_instances ADD COLUMN {col} {col_def}"
+                ))
+                logger.info("Migration: added %s to assessment_question_instances", col)
+
 
 async def close_db() -> None:
     global engine

@@ -254,10 +254,15 @@ class AssessmentService:
         )
         question_obj = question_result.scalar_one_or_none()
 
+        # Determine the question text that was actually asked
+        asked_text = instance.follow_up_question_text or (
+            question_obj.question_text if question_obj else ""
+        )
+
         eval_result = None
         if question_obj:
             eval_result = evaluation_service.evaluate(
-                question_text=question_obj.question_text,
+                question_text=asked_text,
                 expected_answer=question_obj.expected_answer or "",
                 student_answer=response_text,
                 competency=instance.competency,
@@ -282,13 +287,87 @@ class AssessmentService:
                 self.session.add(link)
             await self.session.flush()
 
-        # Count asked questions
+        # Count only root (bank) questions toward the session limit
         count_result = await self.session.execute(
             select(func.count())
             .select_from(AssessmentQuestionInstance)
-            .where(AssessmentQuestionInstance.session_id == session_id)
+            .where(
+                AssessmentQuestionInstance.session_id == session_id,
+                AssessmentQuestionInstance.parent_instance_id.is_(None),
+            )
         )
         asked_count = count_result.scalar() or 0
+
+        # --- Socratic follow-up check ---
+        MAX_FOLLOW_UP_DEPTH = 2
+
+        should_follow_up = (
+            eval_result is not None
+            and question_obj is not None
+            and instance.follow_up_depth < MAX_FOLLOW_UP_DEPTH
+            and evaluation_service.is_partial_understanding(
+                eval_result.score, float(question_obj.max_points)
+            )
+        )
+
+        if should_follow_up:
+            follow_up_text = evaluation_service.generate_follow_up(
+                question_text=asked_text,
+                student_answer=response_text,
+                feedback=eval_result.feedback,
+                competency=instance.competency,
+                misconceptions=eval_result.misconceptions,
+                code_context=session_obj.code_context or "",
+            )
+
+            if follow_up_text:
+                # Determine root instance for the chain
+                root_id = instance.parent_instance_id or instance.id
+
+                # Get current total sequence number
+                seq_result = await self.session.execute(
+                    select(func.count())
+                    .select_from(AssessmentQuestionInstance)
+                    .where(AssessmentQuestionInstance.session_id == session_id)
+                )
+                total_instances = seq_result.scalar() or 0
+
+                fu_instance_id = str(uuid4())
+                fu_instance = AssessmentQuestionInstance(
+                    id=fu_instance_id,
+                    session_id=session_id,
+                    question_id=instance.question_id,  # same bank question
+                    sequence_number=total_instances + 1,
+                    asked_at=now,
+                    competency=instance.competency,
+                    difficulty=instance.difficulty,
+                    follow_up_depth=instance.follow_up_depth + 1,
+                    parent_instance_id=root_id,
+                    follow_up_question_text=follow_up_text,
+                )
+                self.session.add(fu_instance)
+                await self.session.flush()
+
+                next_ctx = QuestionWithContext(
+                    question_id=instance.question_id,
+                    question_instance_id=fu_instance_id,
+                    question_text=follow_up_text,
+                    competency=instance.competency,
+                    difficulty=instance.difficulty,
+                    code_context=session_obj.code_context or "",
+                    is_follow_up=True,
+                )
+
+                return SubmitResponseResponse(
+                    response_id=resp.id,
+                    next_question=next_ctx,
+                    is_complete=False,
+                    evaluation_score=resp.evaluation_score,
+                    feedback_text=resp.feedback_text,
+                    detected_misconceptions=resp.detected_misconceptions,
+                )
+
+        # --- Normal flow: check completion or pick next bank question ---
 
         if asked_count >= 3:
             session_obj.status = "completed"
@@ -562,11 +641,17 @@ class AssessmentService:
             )
             question = q_result.scalar_one_or_none()
 
+            # Use follow-up text if present, otherwise bank question text
+            display_text = inst.follow_up_question_text or (
+                question.question_text if question else ""
+            )
+
             exchange = ExchangeOut(
-                question_text=question.question_text if question else "",
+                question_text=display_text,
                 competency=inst.competency,
                 difficulty=inst.difficulty,
                 asked_at=inst.asked_at,
+                is_follow_up=inst.parent_instance_id is not None,
             )
 
             resp = response_map.get(inst.id)

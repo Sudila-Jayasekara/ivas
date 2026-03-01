@@ -56,6 +56,15 @@ class AssessmentQuestionInstance(Base):
     competency: Mapped[str] = mapped_column(String, nullable=False, default="")
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    # --- Socratic follow-up fields ---
+    follow_up_depth: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    parent_instance_id: Mapped[str | None] = mapped_column(
+        PG_UUID(as_uuid=False),
+        ForeignKey("assessment_question_instances.id"),
+        nullable=True,
+    )
+    follow_up_question_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
 
 class StudentResponse(Base):
     __tablename__ = "student_responses"
