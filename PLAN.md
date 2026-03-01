@@ -57,14 +57,13 @@
 
 ### Day 7-8: Voice Input via Gemini Live Audio API
 
-❌ 16. Add a WebSocket endpoint `WS /assessments/sessions/{session_id}/voice` for real-time audio streaming
+✅ 16. Add a WebSocket endpoint `WS /assessments/sessions/{session_id}/voice` for real-time audio streaming
 
-❌ 17. Integrate Gemini Live Audio API for speech-to-text (student speaks → transcription)
+✅ 17. Integrate Gemini Live Audio API for speech-to-text (student speaks → transcription)
 
-⚠️ 18. Pipe transcribed text into `submit_response()` flow (set `response_type="voice"`, save `transcript_text`)
-> The fields `response_type` and `transcript_text` exist in the model. The actual pipeline is not wired up.
+✅ 18. Pipe transcribed text into `submit_response()` flow (set `response_type="audio"`, save `transcript_text`)
 
-❌ 19. Optionally use Gemini audio to read questions aloud (text-to-speech back over WebSocket)
+✅ 19. Optionally use Gemini audio to read questions aloud (text-to-speech back over WebSocket)
 
 ---
 
@@ -121,6 +120,6 @@
 
 ## Progress
 
-✅ Done — 9 of 34
-⚠️ Partial — 7 of 34
-❌ Not started — 18 of 34
+✅ Done — 13 of 34
+⚠️ Partial — 4 of 34
+❌ Not started — 17 of 34
