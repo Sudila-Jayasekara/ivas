@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>IVAS Voice Test</title>
+  <style>
+    body {
+      font-family: monospace;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #0d0d0d;
+      color: #e0e0e0;
+    }
+
+    h1 {
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    p.sub {
+      color: #666;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    label {
+      display: block;
+      margin-top: 14px;
+      color: #888;
+      font-size: 12px;
+    }
+
+    input, textarea {
+      font-family: monospace;
+      font-size: 14px;
+      padding: 7px 10px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 50px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    button {
+      font-family: monospace;
+      font-size: 14px;
+      padding: 8px 16px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover:not(:disabled) {
+      background: #252525;
+    }
+
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    button.danger {
+      border-color: #cc3333;
+      color: #ff6666;
+    }
+
+    button.recording {
+      background: #5c0000;
+      border-color: #cc0000;
+      color: #ff9999;
+    }
+
+    /* ── Current question panel ── */
+    #questionPanel {
+      display: none;
+      margin-top: 16px;
+      padding: 14px;
+      background: #0f1a2e;
+      border: 1px solid #1e3a5f;
+      border-radius: 6px;
+    }
+
+    #questionPanel .progress {
+      font-size: 11px;
+      color: #5a8fbf;
+      margin-bottom: 6px;
+    }
+
+    #questionPanel .qtext {
+      color: #7ec8f0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    #questionPanel .qtype {
+      font-size: 11px;
+      color: #3a6a9f;
+      margin-top: 6px;
+    }
+
+    /* ── Log ── */
+    #log {
+      margin-top: 12px;
+      padding: 12px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      height: 340px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .m {
+      margin: 2px 0;
+    }
+
+    .m.sys {
+      color: #555;
+    }
+
+    .m.q {
+      color: #4fc3f7;
+      font-weight: bold;
+    }
+
+    .m.tx {
+      color: #a5d6a7;
+    }
+
+    .m.eval {
+      color: #fff176;
+    }
+
+    .m.inst {
+      color: #ce93d8;
+      font-style: italic;
+    }
+
+    .m.done {
+      color: #80cbc4;
+      font-weight: bold;
+    }
+
+    .m.err {
+      color: #ef9a9a;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>IVAS Voice Test</h1>
+  <p class="sub">
+    First call <code>POST /api/v1/assessments/trigger</code> to get a session.
+    Paste the IDs below, connect, then speak. You can ask questions,
+    request clarification, or answer. Uses browser Web Speech API (free).
+  </p>
+
+  <label>Server (host:port)</label>
+  <input id="server" value="localhost:8080">
+
+  <label>Session ID</label>
+  <input id="sessionId" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+
+  <label>First Question Instance ID (from trigger response)</label>
+  <input id="qiid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+
+  <label>First Question Text (from trigger response)</label>
+  <textarea id="firstQuestionText" placeholder="Paste the question text here"></textarea>
+
+  <div class="row">
+    <button id="btnConnect" onclick="connect()">Connect</button>
+    <button id="btnRecord" onclick="toggleRecord()" disabled>Speak</button>
+    <button id="btnDisconnect" onclick="disconnect()" disabled class="danger">Disconnect</button>
+  </div>
+
+  <!-- Persistent current question display -->
+  <div id="questionPanel">
+    <div class="progress">Question <span id="qNum">1</span> of 3</div>
+    <div class="qtext" id="qDisplay"></div>
+    <div class="qtype" id="qType"></div>
+  </div>
+
+  <div id="log"></div>
+
+  <script>
+    /* ── state ── */
+    let ws = null
+    let recognition = null
+    let recognizing = false
+    let currentQiid = ''
+    let currentQuestionText = ''
+    let finalTranscript = ''
+    let questionNumber = 1
+
+    /* ── check browser support ── */
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      alert('Your browser does not support the Web Speech API. Use Chrome or Edge.')
+    }
+
+    /* ── logging ── */
+    function log(text, cls = 'sys') {
+      const el = document.getElementById('log')
+      const div = document.createElement('div')
+      div.className = 'm ' + cls
+      div.textContent = '[' + new Date().toLocaleTimeString() + ']  ' + text
+      el.appendChild(div)
+      el.scrollTop = el.scrollHeight
+    }
+
+    /* ── TTS via browser speechSynthesis ── */
+    function speakText(text, cancelPrevious = false) {
+      if (!window.speechSynthesis) {
+        log('speechSynthesis not supported', 'err')
+        return
+      }
+      if (cancelPrevious) {
+        window.speechSynthesis.cancel()
+      }
+      const utt = new SpeechSynthesisUtterance(text)
+      utt.rate = 0.95
+      utt.pitch = 1.0
+      window.speechSynthesis.speak(utt)
+    }
+
+    /* ── update question panel ── */
+    function showQuestion(text, isFollowUp) {
+      currentQuestionText = text
+      document.getElementById('questionPanel').style.display = 'block'
+      document.getElementById('qDisplay').textContent = text
+      document.getElementById('qType').textContent = isFollowUp ? 'Follow-up question' : ''
+    }
+
+    /* ── connection ── */
+    function connect() {
+      const server = document.getElementById('server').value.trim()
+      const sessionId = document.getElementById('sessionId').value.trim()
+      currentQiid = document.getElementById('qiid').value.trim()
+      const firstQText = document.getElementById('firstQuestionText').value.trim()
+
+      if (!sessionId) { alert('Enter a session ID'); return }
+
+      const url = `ws://${server}/api/v1/assessments/sessions/${sessionId}/voice`
+      log('Connecting -> ' + url)
+
+      ws = new WebSocket(url)
+
+      ws.onopen = () => {
+        log('Connected')
+        document.getElementById('btnConnect').disabled = true
+        document.getElementById('btnRecord').disabled = false
+        document.getElementById('btnDisconnect').disabled = false
+
+        // Send start_session with first question context
+        if (currentQiid) {
+          ws.send(JSON.stringify({
+            type: 'start_session',
+            question_instance_id: currentQiid,
+            question_text: firstQText,
+          }))
+        }
+
+        // Show first question if provided
+        if (firstQText) {
+          showQuestion(firstQText, false)
+          speakText(firstQText, true)
+          log('--- Question 1 ---', 'q')
+          log(firstQText, 'q')
+        }
+      }
+
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data)
+        switch (msg.type) {
+
+          case 'instructor_response':
+            log('Instructor: ' + msg.message, 'inst')
+            speakText(msg.message)
+            if (msg.repeat_question) {
+              log('Question: ' + msg.repeat_question, 'q')
+              speakText(msg.repeat_question)
+            }
+            document.getElementById('btnRecord').disabled = false
+            break
+
+          case 'evaluation':
+            log('Score: ' + (msg.score ?? '-') + ' / 10', 'eval')
+            log('Feedback: ' + (msg.feedback ?? ''), 'eval')
+            if (msg.misconceptions && msg.misconceptions.length)
+              log('Misconceptions: ' + msg.misconceptions.join(', '), 'eval')
+            // Speak the feedback
+            if (msg.feedback) speakText(msg.feedback)
+            break
+
+          case 'next_question':
+            currentQiid = msg.question_instance_id
+            if (!msg.is_follow_up) {
+              questionNumber++
+              document.getElementById('qNum').textContent = questionNumber
+            }
+            showQuestion(msg.question_text, msg.is_follow_up)
+            log('--- ' + (msg.is_follow_up ? 'Follow-up' : 'Question ' + questionNumber) + ' ---', 'q')
+            log(msg.question_text, 'q')
+            speakText(msg.question_text)
+            document.getElementById('btnRecord').disabled = false
+            break
+
+          case 'session_complete':
+            log('--- Session Complete ---', 'done')
+            log('Final score: ' + msg.final_score + ' / ' + msg.max_score, 'done')
+            if (msg.message) log(msg.message, 'done')
+            if (msg.competency_summary)
+              msg.competency_summary.forEach(c =>
+                log('  ' + c.competency + ': ' + (c.percentage ?? 0).toFixed(0) + '%  (' + c.scored + '/' + c.max + ')', 'done'))
+            speakText('Assessment complete. Your final score is ' + msg.final_score + ' out of ' + msg.max_score)
+            document.getElementById('btnRecord').disabled = true
+            document.getElementById('qType').textContent = 'Assessment complete'
+            break
+
+          case 'error':
+            log('Error: ' + msg.message, 'err')
+            document.getElementById('btnRecord').disabled = false
+            break
+        }
+      }
+
+      ws.onerror = () => log('WebSocket error', 'err')
+      ws.onclose = () => { log('Disconnected'); resetUI() }
+    }
+
+    function disconnect() {
+      if (ws) ws.close()
+    }
+
+    function resetUI() {
+      document.getElementById('btnConnect').disabled = false
+      document.getElementById('btnRecord').disabled = true
+      document.getElementById('btnDisconnect').disabled = true
+      stopRecording()
+    }
+
+    /* ── STT via browser SpeechRecognition ── */
+    function toggleRecord() {
+      if (!recognizing) {
+        startRecording()
+      } else {
+        stopRecording()
+      }
+    }
+
+    function startRecording() {
+      if (!SpeechRecognition) return
+
+      // Stop any ongoing TTS so it doesn't interfere with mic
+      window.speechSynthesis && window.speechSynthesis.cancel()
+
+      recognition = new SpeechRecognition()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+
+      finalTranscript = ''
+
+      recognition.onstart = () => {
+        recognizing = true
+        document.getElementById('btnRecord').textContent = 'Stop & Submit'
+        document.getElementById('btnRecord').classList.add('recording')
+        log('Listening...')
+      }
+
+      recognition.onresult = (event) => {
+        let interim = ''
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript
+          } else {
+            interim += event.results[i][0].transcript
+          }
+        }
+      }
+
+      recognition.onerror = (event) => {
+        if (event.error === 'no-speech') {
+          log('No speech detected, try again', 'err')
+        } else if (event.error !== 'aborted') {
+          log('Speech recognition error: ' + event.error, 'err')
+        }
+      }
+
+      recognition.onend = () => {
+        recognizing = false
+        document.getElementById('btnRecord').textContent = 'Speak'
+        document.getElementById('btnRecord').classList.remove('recording')
+
+        // Submit if we have text
+        if (finalTranscript.trim()) {
+          submitAnswer(finalTranscript.trim())
+        }
+      }
+
+      recognition.start()
+    }
+
+    function stopRecording() {
+      if (recognition && recognizing) {
+        recognition.stop()
+      }
+      recognizing = false
+      document.getElementById('btnRecord').textContent = 'Speak'
+      document.getElementById('btnRecord').classList.remove('recording')
+    }
+
+    function submitAnswer(text) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return
+
+      log('You: ' + text, 'tx')
+      document.getElementById('btnRecord').disabled = true
+
+      ws.send(JSON.stringify({
+        type: 'submit_answer',
+        question_instance_id: currentQiid,
+        text: text,
+      }))
+
+      log('Processing...', 'sys')
+    }
+  </script>
+
+</body>
+
+</html>
