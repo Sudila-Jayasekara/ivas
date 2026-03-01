@@ -73,29 +73,10 @@ Then gently redirect them back to answering the assessment question.
 Return ONLY your response text, nothing else.""",
 }
 
-# Patterns that can be detected without an LLM call
-_REPEAT_KEYWORDS = [
-    "repeat", "say that again", "come again", "what was the question",
-    "can you repeat", "say again", "one more time", "didn't hear",
-    "pardon", "sorry what", "tell me again", "ask again",
-]
-
-
 # ── Service ───────────────────────────────────────────────────────────
 
 class VoiceService:
     """Intent classification and conversational response generation."""
-
-    @staticmethod
-    def _quick_classify(text: str) -> ClassificationResult | None:
-        """Fast regex-based classification for obvious cases. Returns None to fall through to LLM."""
-        lower = text.lower().strip()
-        for pattern in _REPEAT_KEYWORDS:
-            if pattern in lower:
-                return ClassificationResult(
-                    intent=StudentIntent.REPEAT_REQUEST, confidence=1.0
-                )
-        return None
 
     @staticmethod
     def _parse_classification(raw: str) -> ClassificationResult:
@@ -121,16 +102,10 @@ class VoiceService:
         self, student_text: str, question_text: str
     ) -> ClassificationResult:
         """
-        Classify student speech intent. SYNCHRONOUS — call via run_in_executor.
+        Classify student speech intent via LLM. SYNCHRONOUS — call via run_in_executor.
 
         Falls back to ANSWER_ATTEMPT if anything goes wrong.
         """
-        # Try fast path first
-        quick = self._quick_classify(student_text)
-        if quick is not None:
-            logger.debug("Quick classified as %s: %s", quick.intent, student_text[:80])
-            return quick
-
         try:
             raw = llm_service.generate(
                 prompt=CLASSIFICATION_PROMPT.format(
