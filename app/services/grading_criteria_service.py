@@ -128,7 +128,14 @@ class GradingCriteriaService:
 
     @staticmethod
     def _build_prompt(assignment_text: str) -> str:
-        return f"""You are an expert university lecturer designing an ORAL VIVA assessment. Analyse the following assignment text and produce grading criteria that can ONLY be assessed through spoken conversation — no written answers, no live coding.
+        return f"""You are an expert university lecturer designing an ORAL VIVA assessment for BEGINNER students.
+The students will answer questions by SPEAKING into a microphone (speech-to-text).
+
+Analyse the following assignment text and produce grading criteria that:
+- Can ONLY be assessed through spoken conversation
+- Are appropriate for BEGINNER-level students
+- Lead to SHORT, SIMPLE questions answerable in 1-3 spoken sentences
+- Do NOT require reciting code syntax, writing code, or giving long technical explanations
 
 ASSIGNMENT TEXT:
 \"\"\"
@@ -140,73 +147,70 @@ From the assignment text above you must extract:
 2. A list of learning objectives the assignment addresses.
 3. A set of oral-viva grading criteria covering different competencies and Bloom's taxonomy levels.
 
-Each criterion must be designed so that an assessor can probe student understanding purely through verbal questions and conversation. Do NOT produce criteria that require the student to write code, run programs, or submit text. Everything must be testable by asking the student to EXPLAIN, JUSTIFY, DESCRIBE, or DISCUSS verbally.
+Each criterion must be designed so an assessor can probe student understanding purely through
+simple verbal questions. Students are BEGINNERS answering by VOICE — keep everything simple.
+
+═══════════════════════════════════════════════════════════════
+VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
+═══════════════════════════════════════════════════════════════
+
+- Students answer by SPEAKING (speech-to-text may garble technical terms)
+- Every question derived from these criteria must be answerable in 1-3 SHORT sentences
+- Do NOT create criteria that require students to recite exact code syntax
+- Do NOT create criteria requiring long multi-step explanations
+- PREFER criteria that test conceptual understanding over syntax knowledge
+- Each criterion should lead to ONE focused question, not multi-part questions
+- Think: "Can a beginner explain this in 15 seconds of speaking?"
 
 ═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY RULES (follow these EXACTLY)
 ═══════════════════════════════════════════════════════════════
 
-You MUST map each criterion to ONE of the following Bloom's levels.
+Map each criterion to ONE of the following Bloom's levels.
 Use the EXACT difficulty_level integer AND the EXACT level_label string shown below.
-Use ONLY the action verbs listed for that level — both in level_description and marking_criteria.
 
 ┌─────────────────┬────────────────────┬──────────────────────────────────────────────────────────────────┐
 │ difficulty_level │ level_label        │ Permitted action verbs & what to assess                         │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 1               │ "Remember"         │ DEFINE, LIST, RECALL, NAME, IDENTIFY, STATE                     │
-│                 │                    │ Student recalls facts, terms, definitions from memory.           │
-│                 │                    │ Example Q: "Can you list the data types in C++?"                 │
-│                 │                    │ Example Q: "What is the syntax for declaring a function?"        │
+│ 1               │ "Remember"         │ DEFINE, NAME, RECALL, STATE                                     │
+│                 │                    │ Student recalls ONE simple fact, term, or definition.            │
+│                 │                    │ Example Q: "What data type stores decimal numbers?"              │
+│                 │                    │ Example Q: "What keyword creates a structure in C++?"            │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE, PARAPHRASE, COMPARE, CONTRAST     │
-│                 │                    │ Student demonstrates comprehension by explaining concepts        │
-│                 │                    │ IN THEIR OWN WORDS. No application to new scenarios.             │
-│                 │                    │ Example Q: "Explain why functions are useful in programming."     │
-│                 │                    │ Example Q: "Describe the difference between pass-by-value and    │
-│                 │                    │  pass-by-reference."                                             │
+│ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE                                    │
+│                 │                    │ Student explains ONE concept in their own words (1-2 sentences). │
+│                 │                    │ Example Q: "In your own words, what is a function?"              │
+│                 │                    │ Example Q: "Why do we use variables?"                            │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 3               │ "Apply"            │ DEMONSTRATE, SOLVE, USE, IMPLEMENT (verbally), CALCULATE        │
-│                 │                    │ Student applies knowledge to a SPECIFIC NEW SCENARIO verbally.   │
-│                 │                    │ The question MUST present a concrete scenario and ask the        │
-│                 │                    │ student to walk through their approach step-by-step.             │
-│                 │                    │ Example Q: "Given a radius of 5, walk me through how your        │
-│                 │                    │  function calculates the area."                                  │
-│                 │                    │ Example Q: "If the user enters -3 as input, what would happen    │
-│                 │                    │  in your program and how would you handle it?"                   │
+│ 3               │ "Apply"            │ DEMONSTRATE (verbally), SOLVE, USE                              │
+│                 │                    │ Student describes how they'd handle a SIMPLE scenario.           │
+│                 │                    │ Example Q: "If the radius is 5, how do you calculate the area?"  │
+│                 │                    │ Example Q: "What happens if someone enters a negative number?"   │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 4               │ "Analyse"          │ ANALYSE, DIFFERENTIATE, COMPARE, CONTRAST, EXAMINE, DECONSTRUCT │
-│                 │                    │ Student breaks down a problem into parts, identifies             │
-│                 │                    │ relationships, or compares alternatives with reasoning.          │
-│                 │                    │ The question MUST ask WHY or HOW alternatives differ.            │
-│                 │                    │ Example Q: "Why did you use pass-by-reference here instead of    │
-│                 │                    │  pass-by-value? What would change if you switched?"              │
-│                 │                    │ Example Q: "Compare using a single monolithic function vs.       │
-│                 │                    │  decomposing into multiple functions. What are the trade-offs?"  │
+│ 4               │ "Analyse"          │ COMPARE, DIFFERENTIATE, EXPLAIN WHY                             │
+│                 │                    │ Student identifies ONE difference or trade-off.                  │
+│                 │                    │ Example Q: "Why use a double instead of an int for radius?"      │
+│                 │                    │ Example Q: "What is one benefit of using functions?"             │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, CRITIQUE, DESIGN, PROPOSE, HYPOTHESISE      │
-│                 │                    │ Student makes judgements, defends design decisions, or           │
-│                 │                    │ proposes new solutions to complex/novel situations.              │
-│                 │                    │ The question MUST require critical thinking and justification.   │
-│                 │                    │ Example Q: "If you had to redesign this program to handle 1000   │
-│                 │                    │  shapes, what would you change and why?"                         │
-│                 │                    │ Example Q: "Critique your error handling strategy. What are its  │
-│                 │                    │  weaknesses and how would you improve it?"                       │
+│ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, SUGGEST                                     │
+│                 │                    │ Student makes ONE simple judgment or improvement suggestion.     │
+│                 │                    │ Example Q: "What would you improve about your program?"          │
+│                 │                    │ Example Q: "If you needed more shapes, what would you change?"   │
 └─────────────────┴────────────────────┴──────────────────────────────────────────────────────────────────┘
 
 IMPORTANT CONSTRAINTS:
-- Every criterion's level_description must contain 2-4 example VERBAL QUESTIONS using ONLY the action verbs for that level.
-- Do NOT use "Describe" or "Explain" verbs in Apply/Analyse/Evaluate levels — those belong to Understand.
-- Do NOT use "Walk me through" or scenario-based questions at the Understand level — those belong to Apply.
-- The marking_criteria must describe what assessors LISTEN FOR at the specific Bloom's level, not generic pass/fail.
-- Generate a good spread across difficulty levels (aim for at least 2-3 different levels).
-- Every criterion must be assessable purely through verbal dialogue.
+- Generate EXACTLY 5 criteria — one for EACH Bloom's level (1 through 5). No more, no less.
+- Every criterion's level_description must contain 2-3 example VERBAL QUESTIONS that are SHORT (under 25 words each).
+- The marking_criteria must describe what the assessor LISTENS FOR — keep it beginner-appropriate.
+- Each criterion must target a DIFFERENT competency relevant to the assignment.
+- Every criterion must be assessable through 1-2 simple spoken sentences from the student.
 
 For each grading criterion provide:
-- competency: the skill or knowledge area being probed
+- competency: the skill or knowledge area being probed (keep it simple and focused)
 - difficulty_level: integer 1-5 as per the table above
 - level_label: EXACT string from the table above
-- level_description: 2-4 example VERBAL QUESTIONS using the correct Bloom's verbs
-- marking_criteria: specific observable indicators the assessor LISTENS FOR
+- level_description: 2-3 example SHORT VERBAL QUESTIONS (under 25 words each) using the correct Bloom's verbs
+- marking_criteria: specific observable indicators the assessor LISTENS FOR in a short spoken answer
 
 NOTE: All questions are scored out of a FIXED 10 points. Do NOT include max_points in criteria.
 
@@ -219,13 +223,13 @@ OUTPUT FORMAT (JSON only, no other text):
       "competency": "...",
       "difficulty_level": 2,
       "level_label": "Understand",
-      "level_description": "Explain why ... / Describe how ... / Summarise ...",
-      "marking_criteria": "Full marks: student clearly explains... Partial: student mentions but cannot elaborate... No marks: student cannot answer."
+      "level_description": "Explain what ... / Describe why ...",
+      "marking_criteria": "Full marks: student clearly explains... Partial: mentions but cannot elaborate... No marks: cannot answer."
     }}
   ]
 }}
 
-Return ONLY valid JSON. Generate a comprehensive set of criteria covering all key competencies and multiple Bloom's levels relevant to the assignment.""".strip()
+Return ONLY valid JSON. Generate EXACTLY 5 criteria — one per Bloom's level — covering key competencies from the assignment.""".strip()
 
     # ------------------------------------------------------------------
     # Parse
@@ -276,6 +280,23 @@ Return ONLY valid JSON. Generate a comprehensive set of criteria covering all ke
 
             if not criteria:
                 return None
+
+            # Enforce exactly one criterion per Bloom's level (5 total).
+            # If LLM generated duplicates for a level, keep only the first.
+            seen_levels: set[int] = set()
+            deduped: list[GradingCriteriaAI] = []
+            for c in criteria:
+                if c.difficulty_level not in seen_levels:
+                    seen_levels.add(c.difficulty_level)
+                    deduped.append(c)
+            criteria = deduped
+
+            if len(criteria) != 5:
+                logger.warning(
+                    "Expected 5 criteria (one per Bloom's level), got %d (levels: %s)",
+                    len(criteria),
+                    sorted(seen_levels),
+                )
 
             return {
                 "programming_language": programming_language,
