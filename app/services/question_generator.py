@@ -50,9 +50,14 @@ class QuestionGenerator:
     ) -> str:
         objectives = ", ".join(learning_objectives)
 
-        return f"""You are an expert programming instructor creating oral viva questions.
+        return f"""You are an expert instructor creating SIMPLE oral viva questions for BEGINNER students.
 
-Generate exactly 1 viva voce question for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
+PURPOSE: This viva checks whether the student truly UNDERSTANDS the concepts — not whether
+they can write code. We want to know: Do they understand WHY something works? Can they
+relate it to real-world problems? Can they explain the concept in their own words?
+
+Generate exactly 2 different viva voce questions for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
+The 2 questions must test DIFFERENT aspects of this competency. Do NOT repeat the same question with different wording.
 
 CONTEXT:
 - Programming Language: {programming_language}
@@ -63,6 +68,38 @@ CONTEXT:
 - Learning Objectives: {objectives}
 
 ═══════════════════════════════════════════════════════════════
+CONCEPTUAL UNDERSTANDING — THIS IS WHAT WE'RE CHECKING
+═══════════════════════════════════════════════════════════════
+
+Questions MUST focus on CONCEPTUAL UNDERSTANDING:
+- Ask WHY something exists or matters, not just WHAT it is
+- Ask HOW a concept applies to real-world problems
+- Ask students to EXPLAIN in their own words
+- Ask for COMPARISONS between concepts (at higher levels)
+- Ask WHEN you would use one approach over another
+
+Do NOT:
+- Ask students to write, recite, or describe code syntax
+- Ask "what is the output of this code?"
+- Ask about syntax details (semicolons, brackets, etc.)
+- Test memorisation of function names or language-specific syntax
+
+═══════════════════════════════════════════════════════════════
+VOICE-FIRST DESIGN — THIS IS A SPOKEN ASSESSMENT
+═══════════════════════════════════════════════════════════════
+
+Students answer by SPEAKING into a microphone. Speech-to-text converts
+their voice to text. This means:
+- Questions MUST be SHORT (1-2 sentences max, under 30 words)
+- Questions MUST be simple and direct — one clear thing to answer
+- Answers MUST be expressible in 1-3 SHORT spoken sentences
+- Do NOT ask multi-part questions (no "and also" or "additionally")
+- Do NOT require precise technical jargon that speech-to-text may garble
+- AVOID questions needing lists of more than 3 items
+- PREFER questions answerable with a conceptual explanation
+- Think: "Can a beginner answer this in 15 seconds of speaking?"
+
+═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY QUESTION DESIGN RULES
 ═══════════════════════════════════════════════════════════════
 
@@ -70,52 +107,49 @@ The question MUST match the Bloom's level "{level_label}" (difficulty {difficult
 Follow these rules STRICTLY:
 
 Level 1 — "Remember":
-  → Ask the student to RECALL, DEFINE, LIST, NAME, or STATE facts/terms.
-  → Questions should test memorisation of syntax, definitions, or terminology.
-  → Do NOT ask "why" or "how" — only "what".
-  → Example: "What is the syntax for declaring a struct in C++?"
+  → Ask the student to RECALL or DEFINE a SINGLE concept/term.
+  → Keep it to ONE simple thing to recall.
+  → Example: "What is the purpose of a struct in {programming_language}?"
+  → Example: "What does a variable do in a program?"
 
 Level 2 — "Understand":
-  → Ask the student to EXPLAIN, DESCRIBE, SUMMARISE, COMPARE, or CONTRAST concepts.
-  → The student must demonstrate comprehension IN THEIR OWN WORDS.
-  → Do NOT present a new scenario to solve — that is Apply level.
-  → Do NOT ask them to walk through steps — that is Apply level.
-  → Example: "Explain why using functions improves code readability."
+  → Ask the student to EXPLAIN or DESCRIBE ONE concept in their own words.
+  → Example: "In your own words, why do we use functions in programming?"
+  → Example: "Can you explain what a loop does and why it's useful?"
 
 Level 3 — "Apply":
-  → Present a SPECIFIC CONCRETE SCENARIO and ask the student to walk through
-    how they would SOLVE, USE, IMPLEMENT, or CALCULATE using their knowledge.
-  → The question MUST contain a scenario (e.g., "Given X...", "Imagine you have...").
-  → The student must demonstrate they can USE their knowledge in a new situation.
-  → Example: "Given a rectangle with length 5.5 and width 3.2, walk me through
-    how your function would calculate and display the perimeter."
+  → Give a SIMPLE real-world scenario and ask how they'd use the concept.
+  → Example: "If you were building a student record system, how would you organise the data?"
+  → Example: "How would you use a loop to solve a real-world counting problem?"
 
 Level 4 — "Analyse":
-  → Ask the student to ANALYSE, COMPARE alternatives, find TRADE-OFFS, or
-    DIFFERENTIATE between approaches with reasoning.
-  → The question MUST ask WHY one approach is better/worse or what the
-    TRADE-OFFS are between alternatives.
-  → Example: "Compare using pass-by-reference vs pass-by-value for this function.
-    What are the trade-offs in terms of memory and side effects?"
+  → Ask ONE comparison, trade-off, or "why would you choose" question.
+  → Example: "Why might you use functions instead of putting all your logic in one place?"
+  → Example: "What's the difference between using a struct and using separate variables?"
 
 Level 5 — "Evaluate & Create":
-  → Ask the student to EVALUATE, JUSTIFY, CRITIQUE, DESIGN, or PROPOSE solutions.
-  → The question MUST require critical thinking, judgment, or designing a new approach.
-  → Example: "Critique your error handling approach. What weaknesses does it have,
-    and how would you redesign it for a production system?"
+  → Ask the student to make a judgment, critique, or propose an approach.
+  → Example: "If you were designing a program for a library, how would you structure the data and why?"
+  → Example: "What would go wrong if a program never checked for invalid input?"
 
 CRITICAL RULES:
 1. The question MUST be about "{competency}" specifically.
 2. The question MUST use the action verbs for "{level_label}" level ONLY.
-3. The question must be answerable verbally (no code writing or diagrams).
-4. The expected_answer must describe what a strong student would say at this Bloom's level.
-5. All questions are scored out of 10 points — do NOT include max_points in output.
+3. Maximum 30 words in the question — SHORT and DIRECT.
+4. The expected_answer must be a CONCEPTUAL explanation (not code) that a BEGINNER student would say in 1-3 spoken sentences (under 60 words).
+5. Do NOT ask multi-part questions. ONE question, ONE thing to answer.
+6. Do NOT require code syntax in the answer. Accept conceptual explanations.
+7. All questions are scored out of 10 points — do NOT include max_points in output.
 
-OUTPUT FORMAT (JSON array with exactly 1 item, no other text):
+OUTPUT FORMAT (JSON array with exactly 2 items, no other text):
 [
   {{
-    "question_text": "Your question here",
-    "expected_answer": "Expected student response covering key points..."
+    "question_text": "Your short question here (under 30 words)",
+    "expected_answer": "Brief expected response (under 60 words)..."
+  }},
+  {{
+    "question_text": "A different short question (under 30 words)",
+    "expected_answer": "Brief expected response (under 60 words)..."
   }}
 ]
 
@@ -184,7 +218,8 @@ Return ONLY valid JSON array.""".strip()
             level_description, marking_criteria, programming_language,
             learning_objectives, max_points.  Optionally: criteria_id.
 
-        Generates exactly one question per criteria row (one per competency).
+        Generates exactly two questions per criteria row (one per competency).
+        With 5 Bloom's levels × 2 questions each = 10 questions total.
         """
         all_questions: list[GeneratedQuestionAI] = []
 
@@ -193,7 +228,7 @@ Return ONLY valid JSON array.""".strip()
             difficulty = cr["difficulty_level"]
             criteria_id = cr.get("criteria_id")
             logger.info(
-                "Generating 1 question for competency=%s difficulty=%d",
+                "Generating 2 questions for competency=%s difficulty=%d",
                 competency, difficulty,
             )
 
@@ -210,10 +245,10 @@ Return ONLY valid JSON array.""".strip()
             try:
                 response_text = llm_service.generate(
                     prompt=prompt,
-                    temperature=0.8,
-                    num_predict=2500,
-                    max_output_tokens=2500,
-                    top_p=0.9,
+                    temperature=0.5,
+                    num_predict=1500,
+                    max_output_tokens=1500,
+                    top_p=0.85,
                 )
 
                 questions = self._parse_response(response_text, competency, difficulty)
