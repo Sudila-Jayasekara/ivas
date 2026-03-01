@@ -32,7 +32,8 @@
       font-size: 12px;
     }
 
-    input, textarea {
+    input,
+    textarea {
       font-family: monospace;
       font-size: 14px;
       padding: 7px 10px;
@@ -434,8 +435,10 @@
       log('You: ' + text, 'tx')
       document.getElementById('btnRecord').disabled = true
 
+      // Send as generic "message" — the server's LLM classifies intent
+      // (answer, clarification request, repeat request, topic question, etc.)
       ws.send(JSON.stringify({
-        type: 'submit_answer',
+        type: 'message',
         question_instance_id: currentQiid,
         text: text,
       }))
