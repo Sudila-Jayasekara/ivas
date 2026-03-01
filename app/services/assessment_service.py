@@ -209,6 +209,7 @@ class AssessmentService:
         question_instance_id: str,
         response_text: str,
         response_type: str,
+        transcript_text: str | None = None,
     ) -> SubmitResponseResponse:
         now = datetime.now(timezone.utc)
 
@@ -242,6 +243,7 @@ class AssessmentService:
             student_id=session_obj.student_id,
             response_text=response_text,
             response_type=response_type,
+            transcript_text=transcript_text,
             submitted_at=now,
             response_time_seconds=response_time,
         )
