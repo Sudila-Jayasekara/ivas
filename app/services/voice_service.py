@@ -25,6 +25,7 @@ class StudentIntent(str, Enum):
     CLARIFICATION_REQUEST = "clarification_request"
     REPEAT_REQUEST = "repeat_request"
     TOPIC_QUESTION = "topic_question"
+    PROCEED_REQUEST = "proceed_request"
     OFF_TOPIC = "off_topic"
 
 
@@ -36,39 +37,42 @@ class ClassificationResult:
 
 # ── Prompts ───────────────────────────────────────────────────────────
 
-CLASSIFICATION_PROMPT = """You are classifying a student's speech during an oral programming exam.
+CLASSIFICATION_PROMPT = """You are classifying a student's speech during an oral viva (conceptual understanding assessment).
 
 CURRENT QUESTION BEING ASKED: {question_text}
 
 STUDENT SAID: "{student_text}"
 
 Classify the student's intent as exactly ONE of:
-- answer_attempt: Student is trying to answer the current question (even partially or incorrectly)
-- clarification_request: Student wants the question explained or clarified
+- answer_attempt: Student is trying to answer or explain their understanding of the current question (even partially, vaguely, or incorrectly)
+- clarification_request: Student wants the question explained differently or clarified
 - repeat_request: Student wants the question repeated or said again
-- topic_question: Student is asking a related question about the topic
-- off_topic: Student said something completely unrelated
+- topic_question: Student is asking a related conceptual question about the topic
+- proceed_request: Student wants to move on, skip, or hear the next question (e.g. "next question", "move on", "continue", "skip", "let's go")
+- off_topic: Student said something completely unrelated to the assessment
 
 Return ONLY valid JSON: {{"intent": "...", "confidence": 0.95}}"""
 
 RESPONSE_PROMPTS = {
-    StudentIntent.CLARIFICATION_REQUEST: """You are a friendly programming instructor during an oral exam.
+    StudentIntent.CLARIFICATION_REQUEST: """You are a friendly instructor during an oral viva (conceptual understanding check).
 The student asked for clarification on this question:
 
 QUESTION: {question_text}
 STUDENT SAID: "{student_text}"
 
 Provide a brief clarification that helps them understand what is being asked WITHOUT revealing the answer.
+Focus on helping them think about the CONCEPT, not code syntax.
 Keep it to 2-3 sentences. Be encouraging.
 Return ONLY your response text, nothing else.""",
 
-    StudentIntent.TOPIC_QUESTION: """You are a friendly programming instructor during an oral exam.
-The student asked a related question about the topic:
+    StudentIntent.TOPIC_QUESTION: """You are a friendly instructor during an oral viva (conceptual understanding check).
+The student asked a related conceptual question about the topic:
 
 CURRENT ASSESSMENT QUESTION: {question_text}
 STUDENT ASKED: "{student_text}"
 
-Give a brief, helpful response (2-3 sentences). Guide their thinking without giving away the answer to the assessment question.
+Give a brief, helpful response (2-3 sentences) that deepens their conceptual understanding.
+Guide their thinking without giving away the answer to the assessment question.
 Then gently redirect them back to answering the assessment question.
 Return ONLY your response text, nothing else.""",
 }
@@ -142,6 +146,9 @@ class VoiceService:
         """
         if intent == StudentIntent.REPEAT_REQUEST:
             return "Sure, let me repeat the question for you."
+
+        if intent == StudentIntent.PROCEED_REQUEST:
+            return "Sure, let's move on to the next question."
 
         if intent == StudentIntent.OFF_TOPIC:
             return (
