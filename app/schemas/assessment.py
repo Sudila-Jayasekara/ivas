@@ -20,6 +20,7 @@ class QuestionWithContext(BaseModel):
     difficulty: int
     code_context: str = ""
     hint: str = ""
+    is_follow_up: bool = False
 
 
 # --- Trigger ---
@@ -68,6 +69,9 @@ class QuestionInstanceOut(BaseModel):
     asked_at: datetime
     competency: str
     difficulty: int
+    follow_up_depth: int = 0
+    parent_instance_id: str | None = None
+    follow_up_question_text: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -147,6 +151,7 @@ class ExchangeOut(BaseModel):
     evaluation_score: float | None = None
     feedback_text: str | None = None
     detected_misconceptions: list[str] | None = None
+    is_follow_up: bool = False
 
 
 class AssessmentTranscriptOut(BaseModel):

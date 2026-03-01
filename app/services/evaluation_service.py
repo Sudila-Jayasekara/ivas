@@ -155,6 +155,71 @@ Return ONLY valid JSON.""".strip()
                 competency_scores={competency: 0.0},
             )
 
+    # ------------------------------------------------------------------
+    # Socratic follow-up generation
+    # ------------------------------------------------------------------
+
+    def is_partial_understanding(self, score: float, max_points: float) -> bool:
+        """Return True if the score indicates partial understanding (30-70% range)."""
+        if max_points <= 0:
+            return False
+        pct = score / max_points
+        return 0.3 <= pct <= 0.7
+
+    def generate_follow_up(
+        self,
+        question_text: str,
+        student_answer: str,
+        feedback: str,
+        competency: str,
+        misconceptions: list[str] | None = None,
+        code_context: str = "",
+    ) -> str | None:
+        """Generate a single Socratic follow-up question via LLM.
+
+        Returns the follow-up question text, or None on failure.
+        """
+        misconception_section = ""
+        if misconceptions:
+            misconception_section = (
+                f"\nDETECTED MISCONCEPTIONS: {', '.join(misconceptions)}\n"
+            )
+
+        code_section = ""
+        if code_context:
+            code_section = f"\nSTUDENT'S CODE CONTEXT:\n{code_context}\n"
+
+        prompt = f"""You are a Socratic programming tutor. The student gave a partially correct answer and you need to ask ONE short follow-up question to guide them toward the correct understanding.
+
+ORIGINAL QUESTION: {question_text}
+STUDENT'S ANSWER: {student_answer}
+EVALUATION FEEDBACK: {feedback}
+{misconception_section}{code_section}
+COMPETENCY: {competency}
+
+RULES:
+1. Ask exactly ONE concise follow-up question (1-2 sentences).
+2. The question should guide the student to discover the gap in their understanding.
+3. Do NOT reveal the answer — help them think through it.
+4. Keep it conversational and encouraging.
+
+Return ONLY the follow-up question text, nothing else.""".strip()
+
+        try:
+            raw = llm_service.generate(
+                prompt=prompt,
+                temperature=0.5,
+                max_output_tokens=300,
+                num_predict=300,
+            )
+            text = raw.strip().strip('"').strip("'")
+            if text:
+                return text
+            return None
+        except Exception as e:
+            logger.error("Follow-up generation failed: %s", e, exc_info=True)
+            return None
+
 
 # Singleton
 evaluation_service = EvaluationService()
