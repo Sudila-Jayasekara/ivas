@@ -25,6 +25,7 @@ from app.api.routes.assessments import router as assessments_router
 from app.api.routes.students import router as students_router
 from app.api.routes.instructors import router as instructors_router
 from app.api.routes.llm import router as llm_router
+from app.api.routes.voice import router as voice_router
 
 # --- logging ---
 
@@ -81,6 +82,7 @@ app.include_router(llm_router)
 app.include_router(grading_criteria_router, prefix="/api/v1")
 app.include_router(questions_router, prefix="/api/v1")
 app.include_router(assessments_router, prefix="/api/v1")
+app.include_router(voice_router, prefix="/api/v1")
 app.include_router(students_router, prefix="/api/v1")
 app.include_router(instructors_router, prefix="/api/v1")
 
