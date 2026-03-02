@@ -47,8 +47,32 @@ class QuestionGenerator:
         marking_criteria: str,
         programming_language: str,
         learning_objectives: list[str],
+        assignment_text: str = "",
     ) -> str:
         objectives = ", ".join(learning_objectives)
+
+        assignment_section = ""
+        if assignment_text:
+            assignment_section = f"""
+═══════════════════════════════════════════════════════════════
+ASSIGNMENT REFERENCE — FOR CONTEXT ONLY
+═══════════════════════════════════════════════════════════════
+
+The student completed THIS assignment. The assignment uses a SCENARIO
+(e.g. mountains, students, books) as a vehicle for teaching programming.
+You MAY reference the scenario to make questions feel familiar, but the
+question MUST test the TECHNICAL PROGRAMMING COMPETENCY, not domain knowledge.
+
+GOOD: "In your mountain program, why did you use an array instead of separate variables?"
+  → Tests: arrays (technical)
+BAD: "Why do we need to save the heights of mountains?"
+  → Tests: mountains (domain)
+
+ASSIGNMENT:
+\"\"\"
+{assignment_text}
+\"\"\"
+"""
 
         return f"""You are an expert instructor creating SIMPLE oral viva questions for BEGINNER students.
 
@@ -58,7 +82,7 @@ relate it to real-world problems? Can they explain the concept in their own word
 
 Generate exactly 2 different viva voce questions for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
 The 2 questions must test DIFFERENT aspects of this competency. Do NOT repeat the same question with different wording.
-
+{assignment_section}
 CONTEXT:
 - Programming Language: {programming_language}
 - Competency: {competency}
@@ -71,18 +95,20 @@ CONTEXT:
 CONCEPTUAL UNDERSTANDING — THIS IS WHAT WE'RE CHECKING
 ═══════════════════════════════════════════════════════════════
 
-Questions MUST focus on CONCEPTUAL UNDERSTANDING:
-- Ask WHY something exists or matters, not just WHAT it is
-- Ask HOW a concept applies to real-world problems
-- Ask students to EXPLAIN in their own words
-- Ask for COMPARISONS between concepts (at higher levels)
-- Ask WHEN you would use one approach over another
+Questions MUST focus on TECHNICAL PROGRAMMING UNDERSTANDING:
+- Ask WHY a programming concept exists or matters
+- Ask HOW a technical concept applies to solving problems
+- Ask students to EXPLAIN a programming decision in their own words
+- Ask for COMPARISONS between programming approaches (at higher levels)
+- Ask WHEN you would use one technical approach over another
 
 Do NOT:
+- Ask about the domain/scenario itself (mountains, heights, scores, etc.)
 - Ask students to write, recite, or describe code syntax
 - Ask "what is the output of this code?"
 - Ask about syntax details (semicolons, brackets, etc.)
-- Test memorisation of function names or language-specific syntax
+- Test memorisation of function names, data type names, or language-specific syntax
+- Ask students to NAME or RECALL specific keywords (e.g. "What data type stores...?")
 
 ═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — THIS IS A SPOKEN ASSESSMENT
@@ -98,6 +124,7 @@ their voice to text. This means:
 - AVOID questions needing lists of more than 3 items
 - PREFER questions answerable with a conceptual explanation
 - Think: "Can a beginner answer this in 15 seconds of speaking?"
+- Expected answers should use everyday language a beginner would naturally speak
 
 ═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY QUESTION DESIGN RULES
@@ -107,42 +134,43 @@ The question MUST match the Bloom's level "{level_label}" (difficulty {difficult
 Follow these rules STRICTLY:
 
 Level 1 — "Remember":
-  → Ask the student to RECALL or DEFINE a SINGLE concept/term.
+  → Ask the student to RECALL or explain the PURPOSE of a programming concept.
   → Keep it to ONE simple thing to recall.
-  → Example: "What is the purpose of a struct in {programming_language}?"
-  → Example: "What does a variable do in a program?"
+  → Example: "What does an array let you do in a program?"
+  → Example: "What is the purpose of reading input from the user?"
 
 Level 2 — "Understand":
-  → Ask the student to EXPLAIN or DESCRIBE ONE concept in their own words.
-  → Example: "In your own words, why do we use functions in programming?"
-  → Example: "Can you explain what a loop does and why it's useful?"
+  → Ask the student to EXPLAIN or DESCRIBE ONE programming concept in their own words.
+  → Example: "Why would you use an array instead of separate variables in your program?"
+  → Example: "In your own words, why is sorting useful when you need specific values?"
 
 Level 3 — "Apply":
-  → Give a SIMPLE, DIRECTLY RELEVANT scenario and ask how they'd use the concept.
-  → The scenario MUST be a realistic programming situation (building an app, processing data, etc.).
-  → Example: "If you were building a student record system, how would you organise the data?"
-  → Example: "How would you use a loop to process a list of student grades?"
+  → Ask how they'd apply a technical concept to solve a problem.
+  → MAY reference the assignment scenario for context.
+  → Example: "How would you find the largest value stored in an array?"
+  → Example: "What would you do if the user entered invalid input in your program?"
 
 Level 4 — "Analyse":
-  → Ask ONE comparison, trade-off, or "why would you choose" question.
-  → Example: "Why might you use functions instead of putting all your logic in one place?"
-  → Example: "What's the difference between using a struct and using separate variables?"
+  → Ask ONE comparison, trade-off, or "why would you choose" question about techniques.
+  → Example: "What's the difference between sorting all values and just finding the largest?"
+  → Example: "Why might you choose a loop over writing each comparison separately?"
 
 Level 5 — "Evaluate & Create":
-  → Ask the student to make a judgment, critique, or propose an approach.
-  → Example: "If you were designing a program for a library, how would you structure the data and why?"
-  → Example: "What would go wrong if a program never checked for invalid input?"
+  → Ask the student to make a judgment, critique, or propose a technical approach.
+  → Example: "How would you change your program if you needed to handle more values?"
+  → Example: "What would go wrong if your program never checked for invalid input?"
 
 CRITICAL RULES:
 1. The question MUST be about "{competency}" specifically.
 2. The question MUST use the action verbs for "{level_label}" level ONLY.
 3. Maximum 30 words in the question — SHORT and DIRECT.
-4. The expected_answer must be a CONCEPTUAL explanation (not code) that a BEGINNER student would say in 1-3 spoken sentences (under 60 words).
+4. The expected_answer must be a CONCEPTUAL explanation (not code) that a BEGINNER student would say in 1-3 spoken sentences (under 60 words). Use everyday language.
 5. Do NOT ask multi-part questions. ONE question, ONE thing to answer.
 6. Do NOT require code syntax in the answer. Accept conceptual explanations.
 7. All questions are scored out of 10 points — do NOT include max_points in output.
-8. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.). If you use an example or scenario, it MUST be directly related to programming or the specific competency. Ask about the concept DIRECTLY — e.g. "Why would you use a variable?" NOT "Imagine you're collecting apples in baskets...".
-9. Keep examples in the PROGRAMMING DOMAIN — use scenarios like building apps, processing data, managing records, etc.
+8. Questions MUST test the TECHNICAL COMPETENCY — NOT domain knowledge. The question should test programming skills, not facts about mountains/students/etc.
+9. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.).
+10. The 2 questions must test genuinely DIFFERENT aspects — if both questions would get the same answer, they are too similar.
 
 OUTPUT FORMAT (JSON array with exactly 2 items, no other text):
 [
@@ -212,6 +240,7 @@ Return ONLY valid JSON array.""".strip()
         self,
         *,
         criteria_rows: list[dict],
+        assignment_text: str = "",
     ) -> list[GeneratedQuestionAI]:
         """
         Parameters
@@ -219,7 +248,9 @@ Return ONLY valid JSON array.""".strip()
         criteria_rows : list[dict]
             Each dict must contain: competency, difficulty_level, level_label,
             level_description, marking_criteria, programming_language,
-            learning_objectives, max_points.  Optionally: criteria_id.
+            learning_objectives.  Optionally: criteria_id.
+        assignment_text : str
+            The original assignment text, used to keep questions in context.
 
         Generates exactly two questions per criteria row (one per competency).
         With 5 Bloom's levels × 2 questions each = 10 questions total.
@@ -243,6 +274,7 @@ Return ONLY valid JSON array.""".strip()
                 marking_criteria=cr["marking_criteria"],
                 programming_language=cr["programming_language"],
                 learning_objectives=cr["learning_objectives"],
+                assignment_text=assignment_text,
             )
 
             try:
