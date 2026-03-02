@@ -46,7 +46,7 @@ from app.services.evaluation_service import evaluation_service
 logger = logging.getLogger(__name__)
 
 # --- Session & question flow limits ---
-MAX_TOTAL_EXCHANGES = 25        # Hard cap on total exchanges in a session
+MAX_TOTAL_EXCHANGES = 30        # Hard cap on total exchanges in a session (10 questions + follow-ups/re-asks)
 MAX_EXCHANGES_PER_QUESTION = 3  # Max exchanges (root + follow-ups + re-asks) per bank question
 MAX_FOLLOW_UP_DEPTH = 1         # Max Socratic follow-ups per question chain
 MAX_REASK_COUNT = 1             # Max re-asks for low-score responses
@@ -228,35 +228,7 @@ class AssessmentService:
         now: datetime,
     ) -> SubmitResponseResponse:
         """Move to the next bank question, or complete the session if done."""
-        # Count root (bank) questions asked so far
-        count_result = await self.session.execute(
-            select(func.count())
-            .select_from(AssessmentQuestionInstance)
-            .where(
-                AssessmentQuestionInstance.session_id == session_id,
-                AssessmentQuestionInstance.parent_instance_id.is_(None),
-            )
-        )
-        asked_count = count_result.scalar() or 0
-
-        if asked_count >= 3:
-            session_obj.status = "completed"
-            session_obj.completed_at = now
-            await self._compute_session_scores(session_obj)
-            await self.session.flush()
-            return SubmitResponseResponse(
-                response_id=resp.id,
-                is_complete=True,
-                message="Assessment completed",
-                evaluation_score=resp.evaluation_score,
-                feedback_text=resp.feedback_text,
-                detected_misconceptions=resp.detected_misconceptions,
-                final_score=session_obj.final_score,
-                max_score=session_obj.max_score,
-                competency_summary=session_obj.competency_summary,
-            )
-
-        # Get already-asked question IDs
+        # Get already-asked question IDs (all instances, including follow-ups)
         asked_result = await self.session.execute(
             select(AssessmentQuestionInstance.question_id).where(
                 AssessmentQuestionInstance.session_id == session_id

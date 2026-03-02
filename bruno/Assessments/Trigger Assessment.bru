@@ -22,6 +22,13 @@ body:json {
   }
 }
 
+script:post-response {
+  const data = res.getBody();
+  
+  bru.setVar("session_id", data.session_id);
+  bru.setVar("question_instance_id", data.first_question.question_instance_id);
+}
+
 docs {
   Trigger a new assessment session for a student.
   The viva checks conceptual understanding — not code correctness.

@@ -26,6 +26,14 @@ body:json {
   }
 }
 
+script:post-response {
+  const data = res.getBody();
+  
+  if (data.next_question && data.next_question.question_instance_id) {
+    bru.setVar("question_instance_id", data.next_question.question_instance_id);
+  }
+}
+
 docs {
   Submit a student response to a question in the assessment session.
   response_text should be a conceptual explanation (as if spoken in a viva).
