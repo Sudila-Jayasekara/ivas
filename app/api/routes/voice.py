@@ -43,15 +43,18 @@ Server -> Client message types:
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from functools import partial
+from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 
 from app import database
-from app.models.assessment import AssessmentQuestionInstance, StudentResponse
+from app.models.assessment import AssessmentQuestionInstance, AssessmentSession, StudentResponse
 from app.models.question import Question
 from app.services.assessment_service import AssessmentService
+from app.services.conversation_context import build_conversation_context, MAX_CLARIFICATIONS_BEFORE_ESCALATION
 from app.services.voice_service import StudentIntent, voice_service
 
 logger = logging.getLogger(__name__)
@@ -81,13 +84,27 @@ async def _lookup_question_text(question_instance_id: str) -> str:
 
 
 async def _is_duplicate_response(question_instance_id: str) -> bool:
-    """Check if a response was already submitted for this question instance."""
+    """Check if an answer-type response was already submitted for this question instance.
+
+    Conversational exchanges (clarification, repeat, topic) do NOT count as
+    duplicate answers — only actual answer attempts and pipeline-processed
+    responses count.
+    """
     assert database.async_session_factory is not None
+    # voice_intents that represent conversational exchanges (not answers)
+    conversational_intents = (
+        "clarification_request", "repeat_request", "topic_question",
+    )
     async with database.async_session_factory() as db:
         result = await db.execute(
             select(func.count())
             .select_from(StudentResponse)
-            .where(StudentResponse.question_instance_id == question_instance_id)
+            .where(
+                StudentResponse.question_instance_id == question_instance_id,
+                # Exclude conversational exchanges from duplicate check
+                ~StudentResponse.voice_intent.in_(conversational_intents)
+                | StudentResponse.voice_intent.is_(None),
+            )
         )
         return (result.scalar() or 0) > 0
 
@@ -95,13 +112,16 @@ async def _is_duplicate_response(question_instance_id: str) -> bool:
 async def _find_next_unanswered_question(
     session_id: str,
 ) -> dict | None:
-    """Find the next question instance in this session that has no response yet.
+    """Find the next question instance in this session that has no answer-type response yet.
 
-    Returns a dict with question_instance_id, question_text, competency,
-    difficulty, is_follow_up — or None if every question has been answered
-    (or the session is complete).
+    Conversational exchanges (clarification, repeat, topic) do NOT count as
+    answers — a question is only 'answered' when an actual answer attempt
+    or pipeline-processed response exists.
     """
     assert database.async_session_factory is not None
+    conversational_intents = (
+        "clarification_request", "repeat_request", "topic_question",
+    )
     async with database.async_session_factory() as db:
         # Get all question instances for the session, ordered by sequence
         inst_result = await db.execute(
@@ -114,10 +134,13 @@ async def _find_next_unanswered_question(
         if not instances:
             return None
 
-        # Get all already-answered question instance IDs
+        # Get question instance IDs that have answer-type responses
         resp_result = await db.execute(
             select(StudentResponse.question_instance_id).where(
-                StudentResponse.session_id == session_id
+                StudentResponse.session_id == session_id,
+                # Only count non-conversational responses as "answered"
+                ~StudentResponse.voice_intent.in_(conversational_intents)
+                | StudentResponse.voice_intent.is_(None),
             )
         )
         answered_ids = {row[0] for row in resp_result.all()}
@@ -143,6 +166,50 @@ async def _find_next_unanswered_question(
                 }
 
         return None
+
+
+async def _store_conversational_exchange(
+    session_id: str,
+    question_instance_id: str,
+    student_text: str,
+    instructor_response: str,
+    voice_intent: str,
+) -> None:
+    """Store a conversational exchange (clarification, repeat, topic question) in the DB.
+
+    These are NOT answer attempts — they are stored for full conversation audit
+    but do not trigger evaluation or affect scoring.
+    """
+    assert database.async_session_factory is not None
+    async with database.async_session_factory() as db:
+        # Look up student_id from session
+        result = await db.execute(
+            select(AssessmentSession.student_id).where(
+                AssessmentSession.id == session_id
+            )
+        )
+        row = result.first()
+        student_id = row[0] if row else "unknown"
+
+        resp = StudentResponse(
+            id=str(uuid4()),
+            question_instance_id=question_instance_id,
+            session_id=session_id,
+            student_id=student_id,
+            response_text=student_text,
+            response_type="audio",
+            transcript_text=student_text,
+            submitted_at=datetime.now(timezone.utc),
+            response_time_seconds=0,
+            # No evaluation for conversational exchanges
+            evaluation_score=None,
+            feedback_text=instructor_response,
+            detected_misconceptions=None,
+            input_classification="conversational",
+            voice_intent=voice_intent,
+        )
+        db.add(resp)
+        await db.commit()
 
 
 @router.websocket("/sessions/{session_id}/voice")
@@ -200,6 +267,21 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
             if not current_question_text and current_qiid:
                 current_question_text = await _lookup_question_text(current_qiid)
 
+            # ── Build conversation context from DB ─────────────────────
+            conv_history_text = ""
+            conv_should_escalate = False
+            if current_qiid:
+                try:
+                    assert database.async_session_factory is not None
+                    async with database.async_session_factory() as ctx_db:
+                        conv_ctx = await build_conversation_context(
+                            ctx_db, current_qiid
+                        )
+                        conv_history_text = conv_ctx.history_text
+                        conv_should_escalate = conv_ctx.should_escalate
+                except Exception as e:
+                    logger.warning("Failed to build conversation context: %s", e)
+
             # ── Send ALL speech to the LLM for intent classification ───
             loop = asyncio.get_running_loop()
             classification = await loop.run_in_executor(
@@ -208,6 +290,7 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                     voice_service.classify_intent,
                     student_text=text,
                     question_text=current_question_text,
+                    conversation_history=conv_history_text,
                 ),
             )
 
@@ -218,72 +301,70 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                 text[:80],
             )
 
-            # ── Non-answer intents: respond conversationally ───────────
-            if classification.intent != StudentIntent.ANSWER_ATTEMPT:
-                # PROCEED_REQUEST: student wants to move to the next question
-                if classification.intent == StudentIntent.PROCEED_REQUEST:
-                    next_q = await _find_next_unanswered_question(session_id)
-                    if next_q and next_q["question_instance_id"] != current_qiid:
-                        # There IS a different unanswered question — advance
-                        current_qiid = next_q["question_instance_id"]
-                        current_question_text = next_q["question_text"]
-                        await websocket.send_json({
-                            "type": "instructor_response",
-                            "message": "Sure, let's move on to the next question.",
-                            "intent": "proceed_request",
-                            "repeat_question": None,
-                        })
-                        await websocket.send_json({
-                            "type": "next_question",
-                            "question_instance_id": next_q["question_instance_id"],
-                            "question_text": next_q["question_text"],
-                            "competency": next_q["competency"],
-                            "difficulty": next_q["difficulty"],
-                            "is_follow_up": next_q["is_follow_up"],
-                        })
-                    elif next_q:
-                        # The unanswered question IS the current one
-                        await websocket.send_json({
-                            "type": "instructor_response",
-                            "message": "You still need to answer the current question first. Let me repeat it.",
-                            "intent": "proceed_request",
-                            "repeat_question": current_question_text,
-                        })
-                    else:
-                        # No unanswered questions — session should be complete
-                        await websocket.send_json({
-                            "type": "instructor_response",
-                            "message": "You've answered all the questions! The assessment is wrapping up.",
-                            "intent": "proceed_request",
-                            "repeat_question": None,
-                        })
-                    continue
-
-                # All other non-answer intents
-                response_text = await loop.run_in_executor(
-                    None,
-                    partial(
-                        voice_service.generate_conversational_response,
-                        intent=classification.intent,
-                        student_text=text,
-                        question_text=current_question_text,
-                    ),
-                )
-
-                repeat_q = None
-                if classification.intent in (
-                    StudentIntent.REPEAT_REQUEST,
-                    StudentIntent.OFF_TOPIC,
+            # ── Non-answer intents: only conversational ones stay here ──
+            # PROCEED_REQUEST and OFF_TOPIC are routed through submit_response
+            # so they get stored in DB and handled by the assessment pipeline
+            # (Input Guard classifies, stores, teaches or re-asks).
+            if classification.intent in (
+                StudentIntent.CLARIFICATION_REQUEST,
+                StudentIntent.REPEAT_REQUEST,
+                StudentIntent.TOPIC_QUESTION,
+            ):
+                # ── Clarification escalation ────────────────────────────
+                # If the student has asked for clarification too many times,
+                # stop looping and route through the assessment pipeline
+                # which will teach the concept and advance.
+                if (
+                    classification.intent == StudentIntent.CLARIFICATION_REQUEST
+                    and conv_should_escalate
                 ):
-                    repeat_q = current_question_text
+                    logger.info(
+                        "Clarification escalation triggered for qiid=%s (count >= %d)",
+                        current_qiid, MAX_CLARIFICATIONS_BEFORE_ESCALATION,
+                    )
+                    # Route through assessment pipeline as "proceed_request"
+                    # so it teaches and moves on
+                    classification = classification.__class__(
+                        intent=StudentIntent.PROCEED_REQUEST,
+                        confidence=1.0,
+                    )
+                    # Fall through to the answer/pipeline path below
+                else:
+                    response_text = await loop.run_in_executor(
+                        None,
+                        partial(
+                            voice_service.generate_conversational_response,
+                            intent=classification.intent,
+                            student_text=text,
+                            question_text=current_question_text,
+                            conversation_history=conv_history_text,
+                        ),
+                    )
 
-                await websocket.send_json({
-                    "type": "instructor_response",
-                    "message": response_text,
-                    "intent": classification.intent.value,
-                    "repeat_question": repeat_q,
-                })
-                continue
+                    repeat_q = None
+                    if classification.intent == StudentIntent.REPEAT_REQUEST:
+                        repeat_q = current_question_text
+
+                    await websocket.send_json({
+                        "type": "instructor_response",
+                        "message": response_text,
+                        "intent": classification.intent.value,
+                        "repeat_question": repeat_q,
+                    })
+
+                    # Store conversational exchange in DB (fire & forget)
+                    if current_qiid:
+                        asyncio.create_task(
+                            _store_conversational_exchange(
+                                session_id=session_id,
+                                question_instance_id=current_qiid,
+                                student_text=text,
+                                instructor_response=response_text,
+                                voice_intent=classification.intent.value,
+                            )
+                        )
+
+                    continue
 
             # ── Answer attempt: run through assessment pipeline ────────
             effective_qiid = question_instance_id or current_qiid
@@ -354,6 +435,7 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                             response_text=text,
                             response_type="audio",
                             transcript_text=text,
+                            voice_intent=classification.intent.value,
                         )
                         await db.commit()
                     except Exception:
