@@ -4,8 +4,10 @@ Evaluation Service — LLM Layer Architecture
 Three-layer LLM pipeline for evaluating student responses:
 
   Layer 1 — Input Guard (real-time):
-      Classifies the student's response as abuse / non_answer / genuine_attempt.
-      Replaces all regex-based detection with a small, fast LLM call.
+      LLM decides the next instructor ACTION based on the student's response:
+        - evaluate:        Student is attempting → proceed to Layer 2
+        - teach_and_skip:  No conceptual content → LLM teaches + move on
+        - warn_and_reask:  Abusive content → LLM-generated warning + re-ask
 
   Layer 2 — Quick Evaluation (real-time):
       Scores the response and produces brief feedback + justification.
@@ -29,8 +31,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class InputGuardResult:
-    classification: str  # "abuse" | "non_answer" | "genuine_attempt"
-    reason: str          # Brief LLM explanation
+    action: str      # "evaluate" | "teach_and_skip" | "warn_and_reask"
+    reason: str      # Brief LLM explanation
+    warning: str = ""  # LLM-generated warning (only for warn_and_reask)
 
 
 @dataclass
@@ -62,27 +65,37 @@ class EvaluationService:
     # ==================================================================
 
     @staticmethod
-    def _build_guard_prompt(student_answer: str, question_text: str) -> str:
-        return f"""You are a content classifier for an oral assessment system. Your ONLY job is to classify the student's input.
+    def _build_guard_prompt(student_answer: str, question_text: str, conversation_history: str = "") -> str:
+        history_block = ""
+        if conversation_history:
+            history_block = f"\n{conversation_history}\n"
 
-QUESTION BEING ASKED: {question_text}
+        return f"""You are an instructor deciding what to do next in an oral assessment.
+
+SPEECH-TO-TEXT NOTE: The student spoke into a microphone. There WILL be transcription errors — interpret garbled words by sound/context (e.g. "arrival" might mean "array will", "struck" might mean "struct"). Focus on MEANING and INTENT.
+
+QUESTION: {question_text}
 
 STUDENT SAID: "{student_answer}"
+{history_block}
+Decide the NEXT ACTION:
 
-Classify as exactly ONE of:
-- "genuine_attempt": The student is trying to answer the question, even if wrong, vague, partial, or poorly worded. ANY attempt to address the topic counts.
-- "non_answer": The student gave NO conceptual content at all. Examples: "yes", "no", "I think so", "okay thank you", "I understand", "I don't know", "not sure", "pass", "next", "skip", "sounds good", "that makes sense". Key test: does the response contain ANY idea, concept, or explanation? If not, it's a non_answer.
-- "abuse": Profanity, insults, threats, or deliberately offensive/disruptive content.
+- "evaluate": The student is attempting to answer — even if wrong, vague, partial, or poorly worded. Any effort to address the topic should be evaluated.
 
-IMPORTANT DISTINCTIONS:
-- "yes I think it's practical and easy" → genuine_attempt (states opinion about topic)
-- "we can use string for store numbers" → genuine_attempt (wrong but attempting)
-- "I think no" or "yes" with zero elaboration → non_answer
-- "okay I understand thank you" → non_answer (acknowledgement, not an answer)
-- "I don't want to write 20 statements" → genuine_attempt (opinion about approach)
+- "teach_and_skip": The student provided NO conceptual content to evaluate. They may be unsure, confused, explicitly don't know, want to skip, gave an empty acknowledgement, or simply have nothing to say about this topic. There is nothing meaningful to score — teach them the concept and move on.
+
+- "warn_and_reask": The student is being abusive, offensive, or deliberately disruptive. Generate a firm but professional warning.
+
+GUIDANCE:
+- If the student says ANYTHING related to the topic (even incorrect), choose "evaluate"
+- If there is no conceptual content at all, choose "teach_and_skip" — never force a student to re-answer when they have nothing to offer
+- Only choose "warn_and_reask" for genuinely abusive or offensive content
+- Speech-to-text may garble words — be generous in interpretation
+- If the conversation history shows the student has been struggling or confused, prefer "teach_and_skip" over forcing more attempts
 
 Return ONLY valid JSON:
-{{"classification": "genuine_attempt", "reason": "Student attempts to explain their understanding"}}""".strip()
+For evaluate/teach_and_skip: {{"action": "<action>", "reason": "brief explanation"}}
+For warn_and_reask: {{"action": "warn_and_reask", "reason": "brief explanation", "warning": "Your firm but professional warning to the student"}}""".strip()
 
     @staticmethod
     def _parse_guard_response(raw: str) -> InputGuardResult:
@@ -91,34 +104,35 @@ Return ONLY valid JSON:
             start = text.find("{")
             end = text.rfind("}") + 1
             if start == -1 or end == 0:
-                return InputGuardResult(classification="genuine_attempt", reason="parse_fallback")
+                return InputGuardResult(action="evaluate", reason="parse_fallback")
             data = json.loads(text[start:end])
-            classification = str(data.get("classification", "genuine_attempt")).lower().strip()
-            if classification not in ("abuse", "non_answer", "genuine_attempt"):
-                classification = "genuine_attempt"
+            action = str(data.get("action", "evaluate")).lower().strip()
+            if action not in ("evaluate", "teach_and_skip", "warn_and_reask"):
+                action = "evaluate"
             reason = str(data.get("reason", ""))
-            return InputGuardResult(classification=classification, reason=reason)
+            warning = str(data.get("warning", ""))
+            return InputGuardResult(action=action, reason=reason, warning=warning)
         except (json.JSONDecodeError, ValueError, TypeError):
-            return InputGuardResult(classification="genuine_attempt", reason="parse_fallback")
+            return InputGuardResult(action="evaluate", reason="parse_fallback")
 
-    def classify_input(self, student_answer: str, question_text: str) -> InputGuardResult:
+    def classify_input(self, student_answer: str, question_text: str, conversation_history: str = "") -> InputGuardResult:
         """Layer 1: Classify student input via LLM. Fast, small prompt. Synchronous."""
         if not student_answer or not student_answer.strip():
-            return InputGuardResult(classification="non_answer", reason="empty input")
+            return InputGuardResult(action="teach_and_skip", reason="empty input")
 
         try:
             raw = llm_service.generate(
-                prompt=self._build_guard_prompt(student_answer, question_text),
+                prompt=self._build_guard_prompt(student_answer, question_text, conversation_history),
                 temperature=0.1,
                 max_output_tokens=150,
                 num_predict=150,
             )
             result = self._parse_guard_response(raw)
-            logger.debug("Input guard: %s — %s", result.classification, result.reason)
+            logger.debug("Input guard: action=%s — %s", result.action, result.reason)
             return result
         except Exception as e:
             logger.error("Input guard LLM failed: %s", e)
-            return InputGuardResult(classification="genuine_attempt", reason="guard_error_fallback")
+            return InputGuardResult(action="evaluate", reason="guard_error_fallback")
 
     # ==================================================================
     # LAYER 2 — Quick Evaluation  (real-time)
@@ -434,6 +448,60 @@ Return ONLY valid JSON.""".strip()
             )
 
     # ==================================================================
+    # Teaching hint for non-answers (real-time)
+    # ==================================================================
+
+    def generate_teaching_hint(
+        self,
+        question_text: str,
+        expected_answer: str,
+        competency: str,
+        conversation_history: str = "",
+    ) -> str:
+        """Generate a brief, kind teaching explanation when the student doesn't know.
+
+        Instead of forcing the student to answer, we teach the concept and move on.
+        Returns the teaching feedback text.
+        """
+        history_block = ""
+        if conversation_history:
+            history_block = f"\n{conversation_history}\n"
+
+        prompt = f"""You are a kind tutor during an oral viva. The student said they don't know the answer. Your job is to BRIEFLY TEACH the concept so they learn from this moment, then we move on to the next question.
+
+QUESTION THAT WAS ASKED: {question_text}
+EXPECTED ANSWER: {expected_answer}
+COMPETENCY: {competency}
+{history_block}
+RULES:
+1. Start with something warm like "No worries!" or "That's okay!" — never shame them.
+2. Explain the core concept in 2-3 simple sentences, suitable for a beginner.
+3. Use the expected answer as your guide but rephrase it in plain, conversational language.
+4. Do NOT just dump the expected answer verbatim — teach it naturally.
+5. End with a brief encouraging note like "Let's move on to the next question."
+6. Keep it SHORT — max 4 sentences total.
+7. Do NOT ask any questions — this is a teaching moment, not a quiz.
+8. If conversation history shows previous explanations, build on them — don't repeat the same explanation.
+
+Return ONLY the teaching text, nothing else.""".strip()
+
+        try:
+            raw = llm_service.generate(
+                prompt=prompt,
+                temperature=0.4,
+                max_output_tokens=300,
+                num_predict=300,
+            )
+            text = raw.strip().strip('"').strip("'")
+            if text:
+                return text
+        except Exception as e:
+            logger.error("Teaching hint generation failed: %s", e)
+
+        # Minimal fallback — only used if the LLM call itself fails
+        return "That's okay! Let's move on to the next question and keep learning."
+
+    # ==================================================================
     # Socratic follow-up (real-time)
     # ==================================================================
 
@@ -452,6 +520,7 @@ Return ONLY valid JSON.""".strip()
         competency: str,
         misconceptions: list[str] | None = None,
         code_context: str = "",
+        conversation_history: str = "",
     ) -> str | None:
         """Generate a single Socratic follow-up question via LLM.
 
@@ -467,12 +536,16 @@ Return ONLY valid JSON.""".strip()
         if code_context:
             code_section = f"\nBACKGROUND (student's code for reference only):\n{code_context}\n"
 
+        history_block = ""
+        if conversation_history:
+            history_block = f"\n{conversation_history}\n"
+
         prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING. The student gave a partially correct answer. Ask ONE follow-up question to guide deeper understanding.
 
 ORIGINAL QUESTION: {question_text}
 STUDENT'S ANSWER: {student_answer}
 EVALUATION FEEDBACK: {feedback}
-{misconception_section}{code_section}
+{misconception_section}{code_section}{history_block}
 COMPETENCY: {competency}
 
 RULES:
@@ -481,8 +554,9 @@ RULES:
 3. Do NOT ask them to write or recite code.
 4. Do NOT reveal the answer — guide their thinking.
 5. Keep it conversational and encouraging.
-6. Do NOT use forced analogies (NO apples, fruits, baskets, cookies). Use programming examples.
+6. Do NOT use forced analogies (NO apples, fruits, baskets, cookies). Stay in the assignment domain.
 7. If a misconception was detected, design the question to challenge that specific misconception.
+8. If conversation history shows previous follow-ups, ask about a DIFFERENT aspect.
 
 Return ONLY the follow-up question text, nothing else.""".strip()
 
