@@ -43,6 +43,7 @@ from app.schemas.assessment import (
 )
 from app.services.evaluation_service import evaluation_service
 from app.services.background_analysis import run_background_analysis
+from app.services.conversation_context import build_conversation_context
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +135,22 @@ class AssessmentService:
     # Exchange counting helpers
     # ------------------------------------------------------------------
 
+    # Conversational voice intents that should NOT count as answer exchanges
+    _CONVERSATIONAL_INTENTS = ("clarification_request", "repeat_request", "topic_question")
+
     async def _count_total_exchanges(self, session_id: str) -> int:
-        """Count total responses (exchanges) in the session."""
+        """Count total answer-type responses (exchanges) in the session.
+
+        Conversational exchanges (clarification, repeat, topic) are excluded.
+        """
         result = await self.session.execute(
             select(func.count())
             .select_from(StudentResponse)
-            .where(StudentResponse.session_id == session_id)
+            .where(
+                StudentResponse.session_id == session_id,
+                ~StudentResponse.voice_intent.in_(self._CONVERSATIONAL_INTENTS)
+                | StudentResponse.voice_intent.is_(None),
+            )
         )
         return result.scalar() or 0
 
@@ -174,6 +185,62 @@ class AssessmentService:
             )
         )
         return result.scalar() or 0
+
+    # ------------------------------------------------------------------
+    # Re-ask the current question (new instance to avoid duplicate check)
+    # ------------------------------------------------------------------
+
+    async def _reask_current_question(
+        self,
+        session_id: str,
+        instance: AssessmentQuestionInstance,
+        session_obj: AssessmentSession,
+        resp: StudentResponse,
+        question_text: str,
+        now: datetime,
+    ) -> SubmitResponseResponse:
+        """Create a new question instance for the same question and return it."""
+        root_id = instance.parent_instance_id or instance.id
+        seq_result = await self.session.execute(
+            select(func.count())
+            .select_from(AssessmentQuestionInstance)
+            .where(AssessmentQuestionInstance.session_id == session_id)
+        )
+        total_instances = seq_result.scalar() or 0
+
+        reask_id = str(uuid4())
+        reask_inst = AssessmentQuestionInstance(
+            id=reask_id,
+            session_id=session_id,
+            question_id=instance.question_id,
+            sequence_number=total_instances + 1,
+            asked_at=now,
+            competency=instance.competency,
+            difficulty=instance.difficulty,
+            follow_up_depth=0,
+            parent_instance_id=root_id,
+            follow_up_question_text=question_text,
+        )
+        self.session.add(reask_inst)
+        await self.session.flush()
+
+        next_ctx = QuestionWithContext(
+            question_id=instance.question_id,
+            question_instance_id=reask_id,
+            question_text=question_text,
+            competency=instance.competency,
+            difficulty=instance.difficulty,
+            code_context=session_obj.code_context or "",
+            question_type="re_ask",
+        )
+        return SubmitResponseResponse(
+            response_id=resp.id,
+            next_question=next_ctx,
+            is_complete=False,
+            evaluation_score=resp.evaluation_score,
+            feedback_text=resp.feedback_text,
+            detected_misconceptions=resp.detected_misconceptions or [],
+        )
 
     # ------------------------------------------------------------------
     # Advance to next bank question (or complete session)
@@ -353,6 +420,7 @@ class AssessmentService:
         response_text: str,
         response_type: str,
         transcript_text: str | None = None,
+        voice_intent: str | None = None,
     ) -> SubmitResponseResponse:
         now = datetime.now(timezone.utc)
 
@@ -401,6 +469,7 @@ class AssessmentService:
             transcript_text=transcript_text,
             submitted_at=now,
             response_time_seconds=response_time,
+            voice_intent=voice_intent,
         )
         self.session.add(resp)
         await self.session.flush()
@@ -427,31 +496,65 @@ class AssessmentService:
             )
 
         # ══════════════════════════════════════════════════════════════
+        # Build conversation history for context-aware LLM calls
+        # ══════════════════════════════════════════════════════════════
+        conv_ctx = await build_conversation_context(
+            self.session, question_instance_id
+        )
+        conversation_history = conv_ctx.history_text
+
+        # ══════════════════════════════════════════════════════════════
         # LAYER 1 — LLM Input Guard
         # ══════════════════════════════════════════════════════════════
         guard_result = await asyncio.to_thread(
             evaluation_service.classify_input,
             student_answer=response_text,
             question_text=asked_text,
+            conversation_history=conversation_history,
         )
-        resp.input_classification = guard_result.classification
+        resp.input_classification = guard_result.action
         await self.session.flush()
 
-        if guard_result.classification == "abuse":
+        # Helper: check if we've hit the per-question exchange cap
+        question_exchanges = await self._count_exchanges_for_question(
+            session_id, instance
+        )
+        at_exchange_cap = question_exchanges >= MAX_EXCHANGES_PER_QUESTION
+
+        if guard_result.action == "warn_and_reask":
             resp.evaluation_score = 0.0
-            resp.feedback_text = "Inappropriate response. Please keep answers respectful and on-topic."
+            resp.feedback_text = guard_result.warning or guard_result.reason
             resp.detected_misconceptions = []
             resp.score_justification = f"Input guard: {guard_result.reason}"
             await self.session.flush()
-            return await self._advance_to_next_question(
-                session_id, session_obj, resp, now
+
+            # If exchange cap hit, advance; otherwise re-ask same question
+            if at_exchange_cap:
+                return await self._advance_to_next_question(
+                    session_id, session_obj, resp, now
+                )
+            return await self._reask_current_question(
+                session_id, instance, session_obj, resp, asked_text, now
             )
 
-        if guard_result.classification == "non_answer":
+        if guard_result.action == "teach_and_skip":
+            # Student has no content to evaluate — teach the concept and move on
             resp.evaluation_score = 0.0
-            resp.feedback_text = "Please try to explain your understanding of the concept. Even a partial answer helps us assess your knowledge."
             resp.detected_misconceptions = []
             resp.score_justification = f"Input guard: {guard_result.reason}"
+
+            if question_obj and question_obj.expected_answer:
+                teaching_hint = await asyncio.to_thread(
+                    evaluation_service.generate_teaching_hint,
+                    question_text=asked_text,
+                    expected_answer=question_obj.expected_answer,
+                    competency=instance.competency,
+                    conversation_history=conversation_history,
+                )
+                resp.feedback_text = teaching_hint
+            else:
+                resp.feedback_text = "That's okay! Let's move on to the next question."
+
             await self.session.flush()
             return await self._advance_to_next_question(
                 session_id, session_obj, resp, now
@@ -535,6 +638,7 @@ class AssessmentService:
                 competency=instance.competency,
                 misconceptions=eval_result.misconceptions,
                 code_context=session_obj.code_context or "",
+                conversation_history=conversation_history,
             )
 
             if follow_up_text:
@@ -667,12 +771,18 @@ class AssessmentService:
         )
         responses = list(r_result.scalars().all())
 
+        # Count only answer-type responses (not conversational exchanges)
+        _conversational = {"clarification_request", "repeat_request", "topic_question"}
+        answered = sum(
+            1 for r in responses if r.voice_intent not in _conversational
+        )
+
         return SessionDetailsOut(
             session=SessionOut.model_validate(session_obj),
             questions_asked=[QuestionInstanceOut.model_validate(q) for q in questions],
             responses=[StudentResponseOut.model_validate(r) for r in responses],
             total_questions=len(questions),
-            answered_questions=len(responses),
+            answered_questions=answered,
         )
 
     # ------------------------------------------------------------------
@@ -813,23 +923,39 @@ class AssessmentService:
             .order_by(AssessmentQuestionInstance.sequence_number.asc())
         )
         instances = list(inst_result.scalars().all())
+        inst_map = {inst.id: inst for inst in instances}
 
+        # Fetch ALL responses (including conversational) ordered chronologically
         resp_result = await self.session.execute(
-            select(StudentResponse).where(StudentResponse.session_id == session_id)
+            select(StudentResponse)
+            .where(StudentResponse.session_id == session_id)
+            .order_by(StudentResponse.submitted_at.asc())
         )
-        responses = list(resp_result.scalars().all())
-        response_map = {r.question_instance_id: r for r in responses}
+        all_responses = list(resp_result.scalars().all())
+
+        # Group responses by question_instance_id
+        from collections import defaultdict
+        responses_by_inst: dict[str, list[StudentResponse]] = defaultdict(list)
+        for r in all_responses:
+            responses_by_inst[r.question_instance_id].append(r)
+
+        # Pre-fetch question texts for all instances
+        question_cache: dict[str, str] = {}
+        for inst in instances:
+            if inst.question_id not in question_cache:
+                q_result = await self.session.execute(
+                    select(Question).where(Question.id == inst.question_id)
+                )
+                question = q_result.scalar_one_or_none()
+                question_cache[inst.question_id] = (
+                    question.question_text if question else ""
+                )
 
         exchanges: list[ExchangeOut] = []
         for inst in instances:
-            q_result = await self.session.execute(
-                select(Question).where(Question.id == inst.question_id)
-            )
-            question = q_result.scalar_one_or_none()
-
             # Use follow-up text if present, otherwise bank question text
-            display_text = inst.follow_up_question_text or (
-                question.question_text if question else ""
+            display_text = inst.follow_up_question_text or question_cache.get(
+                inst.question_id, ""
             )
 
             # Determine question_type: new / follow_up / re_ask
@@ -840,26 +966,37 @@ class AssessmentService:
             else:
                 q_type = "re_ask"
 
-            exchange = ExchangeOut(
-                question_text=display_text,
-                competency=inst.competency,
-                difficulty=inst.difficulty,
-                asked_at=inst.asked_at,
-                is_follow_up=inst.parent_instance_id is not None,
-                question_type=q_type,
-            )
+            inst_responses = responses_by_inst.get(inst.id, [])
 
-            resp = response_map.get(inst.id)
-            if resp:
-                exchange.student_answer = resp.response_text
-                exchange.answered_at = resp.submitted_at
-                exchange.response_time_seconds = resp.response_time_seconds
-                exchange.evaluation_score = resp.evaluation_score
-                exchange.feedback_text = resp.feedback_text
-                exchange.detected_misconceptions = resp.detected_misconceptions
-                exchange.score_justification = resp.score_justification
-
-            exchanges.append(exchange)
+            if not inst_responses:
+                # Question was asked but no response yet
+                exchanges.append(ExchangeOut(
+                    question_text=display_text,
+                    competency=inst.competency,
+                    difficulty=inst.difficulty,
+                    asked_at=inst.asked_at,
+                    is_follow_up=inst.parent_instance_id is not None,
+                    question_type=q_type,
+                ))
+            else:
+                # Emit one exchange per response (conversational + answer)
+                for resp in inst_responses:
+                    exchanges.append(ExchangeOut(
+                        question_text=display_text,
+                        competency=inst.competency,
+                        difficulty=inst.difficulty,
+                        student_answer=resp.response_text,
+                        asked_at=inst.asked_at,
+                        answered_at=resp.submitted_at,
+                        response_time_seconds=resp.response_time_seconds,
+                        evaluation_score=resp.evaluation_score,
+                        feedback_text=resp.feedback_text,
+                        detected_misconceptions=resp.detected_misconceptions,
+                        score_justification=resp.score_justification,
+                        voice_intent=resp.voice_intent,
+                        is_follow_up=inst.parent_instance_id is not None,
+                        question_type=q_type,
+                    ))
 
         return AssessmentTranscriptOut(
             session_id=session_obj.id,
