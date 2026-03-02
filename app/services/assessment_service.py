@@ -3,18 +3,18 @@ Assessment Service
 
 Core business logic for conducting an assessment session. It orchestrates
 the flow between a student requesting an assessment to the LLM generating
-questions and evaluating answers. This service:
-1. Triggers an assessment (creates a session and fetches the first question).
-2. Submits responses (records student answers, calculates time taken, gets the next question).
-3. Evaluates when the assessment is complete.
-4. Returns session transcripts for instructors.
+questions and evaluating answers. This service uses a layered LLM architecture:
+
+  Layer 1 — Input Guard: LLM classifies input (abuse / non_answer / genuine_attempt)
+  Layer 2 — Quick Evaluation: LLM scores + feedback (real-time, for branching)
+  Layer 3 — Deep Analysis: LLM justification + misconceptions (background task)
+
+No regex is used for content classification — all intelligence is LLM-driven.
 """
 
 import asyncio
 import logging
-import re
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -42,38 +42,15 @@ from app.schemas.assessment import (
     TriggerAssessmentResponse,
 )
 from app.services.evaluation_service import evaluation_service
+from app.services.background_analysis import run_background_analysis
 
 logger = logging.getLogger(__name__)
 
 # --- Session & question flow limits ---
-MAX_TOTAL_EXCHANGES = 30        # Hard cap on total exchanges in a session (10 questions + follow-ups/re-asks)
+MAX_TOTAL_EXCHANGES = 30        # Hard cap on total exchanges in a session
 MAX_EXCHANGES_PER_QUESTION = 3  # Max exchanges (root + follow-ups + re-asks) per bank question
 MAX_FOLLOW_UP_DEPTH = 1         # Max Socratic follow-ups per question chain
 MAX_REASK_COUNT = 1             # Max re-asks for low-score responses
-
-# --- Abuse detection patterns ---
-_ABUSE_PATTERN = re.compile(
-    r'\b(?:fuck|shit|bitch|ass(?:hole)?|damn|dick|cunt|bastard|idiot|stupid|'
-    r'your\s+(?:mother|mom|mum|dad|father|sister|family)|'
-    r'go\s+(?:to\s+hell|die|away)|kill\s+yourself|'
-    r'shut\s+(?:up|the\s+fuck)|suck\s+(?:my|it)|screw\s+you)\b',
-    re.IGNORECASE,
-)
-
-# --- Non-answer detection patterns (anchored: must match full response) ---
-_NON_ANSWER_PATTERN = re.compile(
-    r'^\s*(?:'
-    r'yes|no|yeah|nah|yep|nope|ok|okay|sure|maybe|idk|dunno|hmm?|uh+|um+'
-    r'|i\s+don.?t\s+know(?:\s+(?:it|that|this))?'
-    r'|i\s+(?:already\s+)?(?:answer(?:ed)?|said|told)(?:\s+(?:it|that|this|before|already))*'
-    r'|not\s+sure|no\s+idea|no\s+clue'
-    r'|i\s+(?:have\s+)?no\s+(?:idea|clue)'
-    r'|pass|skip|next'
-    r'|i\s+(?:guess|think)\s+(?:so|yes|no|not)'
-    r'|(?:actually\s+)?i.?m\s+not\s+sure(?:\s+(?:about\s+)?(?:it|that|this))?'
-    r')\s*[.!?]*\s*$',
-    re.IGNORECASE,
-)
 
 
 class AssessmentService:
@@ -152,24 +129,6 @@ class AssessmentService:
             })
         session_obj.competency_summary = summary
         await self.session.flush()
-
-    # ------------------------------------------------------------------
-    # Input validation helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _is_abusive(text: str) -> bool:
-        """Detect profanity or abusive language in student response."""
-        if not text or not text.strip():
-            return False
-        return bool(_ABUSE_PATTERN.search(text))
-
-    @staticmethod
-    def _is_non_answer(text: str) -> bool:
-        """Detect non-answers that show zero conceptual understanding."""
-        if not text or not text.strip():
-            return True  # empty / whitespace = non-answer
-        return bool(_NON_ANSWER_PATTERN.search(text.strip()))
 
     # ------------------------------------------------------------------
     # Exchange counting helpers
@@ -451,6 +410,7 @@ class AssessmentService:
         if total_exchanges >= MAX_TOTAL_EXCHANGES:
             resp.evaluation_score = 0.0
             resp.feedback_text = "Session exchange limit reached."
+            resp.input_classification = "exchange_limit"
             session_obj.status = "completed"
             session_obj.completed_at = now
             await self._compute_session_scores(session_obj)
@@ -466,27 +426,40 @@ class AssessmentService:
                 competency_summary=session_obj.competency_summary,
             )
 
-        # --- Abuse detection (skip LLM, score 0, advance) ---
-        if self._is_abusive(response_text):
+        # ══════════════════════════════════════════════════════════════
+        # LAYER 1 — LLM Input Guard
+        # ══════════════════════════════════════════════════════════════
+        guard_result = await asyncio.to_thread(
+            evaluation_service.classify_input,
+            student_answer=response_text,
+            question_text=asked_text,
+        )
+        resp.input_classification = guard_result.classification
+        await self.session.flush()
+
+        if guard_result.classification == "abuse":
             resp.evaluation_score = 0.0
-            resp.feedback_text = "Inappropriate response. Score: 0."
+            resp.feedback_text = "Inappropriate response. Please keep answers respectful and on-topic."
             resp.detected_misconceptions = []
+            resp.score_justification = f"Input guard: {guard_result.reason}"
             await self.session.flush()
             return await self._advance_to_next_question(
                 session_id, session_obj, resp, now
             )
 
-        # --- Non-answer detection (skip LLM, score 0, advance) ---
-        if self._is_non_answer(response_text):
+        if guard_result.classification == "non_answer":
             resp.evaluation_score = 0.0
-            resp.feedback_text = "No substantive answer provided. Score: 0."
+            resp.feedback_text = "Please try to explain your understanding of the concept. Even a partial answer helps us assess your knowledge."
             resp.detected_misconceptions = []
+            resp.score_justification = f"Input guard: {guard_result.reason}"
             await self.session.flush()
             return await self._advance_to_next_question(
                 session_id, session_obj, resp, now
             )
 
-        # --- LLM Evaluation ---
+        # ══════════════════════════════════════════════════════════════
+        # LAYER 2 — LLM Quick Evaluation (real-time)
+        # ══════════════════════════════════════════════════════════════
         eval_result = None
         if question_obj:
             eval_result = await asyncio.to_thread(
@@ -502,6 +475,7 @@ class AssessmentService:
             resp.evaluation_score = eval_result.score
             resp.feedback_text = eval_result.feedback
             resp.detected_misconceptions = eval_result.misconceptions
+            resp.score_justification = eval_result.justification
             await self.session.flush()
 
             # Populate response_competency_links
@@ -515,6 +489,23 @@ class AssessmentService:
                 )
                 self.session.add(link)
             await self.session.flush()
+
+            # ══════════════════════════════════════════════════════════
+            # LAYER 3 — Background Deep Analysis (fire & forget)
+            # ══════════════════════════════════════════════════════════
+            asyncio.create_task(
+                run_background_analysis(
+                    response_id=resp.id,
+                    question_text=asked_text,
+                    expected_answer=question_obj.expected_answer or "",
+                    student_answer=response_text,
+                    competency=instance.competency,
+                    difficulty=instance.difficulty,
+                    score=eval_result.score,
+                    max_points=question_obj.max_points,
+                    feedback=eval_result.feedback,
+                )
+            )
 
         # --- Per-question exchange cap ---
         question_exchanges = await self._count_exchanges_for_question(
@@ -866,6 +857,7 @@ class AssessmentService:
                 exchange.evaluation_score = resp.evaluation_score
                 exchange.feedback_text = resp.feedback_text
                 exchange.detected_misconceptions = resp.detected_misconceptions
+                exchange.score_justification = resp.score_justification
 
             exchanges.append(exchange)
 
