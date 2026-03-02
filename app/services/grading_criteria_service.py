@@ -151,6 +151,33 @@ Each criterion must be designed so an assessor can probe student understanding p
 simple verbal questions. Students are BEGINNERS answering by VOICE — keep everything simple.
 
 ═══════════════════════════════════════════════════════════════
+EXTRACT TECHNICAL COMPETENCIES — NOT DOMAIN KNOWLEDGE
+═══════════════════════════════════════════════════════════════
+
+The assignment uses a SCENARIO (e.g. mountain heights, student grades, library books)
+as a vehicle for teaching PROGRAMMING CONCEPTS. Your job is to identify the
+TECHNICAL/PROGRAMMING competencies the assignment teaches — NOT domain knowledge.
+
+The competency field MUST name a TECHNICAL PROGRAMMING SKILL, not the scenario.
+
+GOOD competencies (technical):
+- "Using arrays to store multiple values"
+- "Sorting data to find specific values"
+- "Reading input from the user"
+- "Comparing values to find the largest"
+- "Formatting program output"
+
+BAD competencies (domain-specific — NEVER do this):
+- "Purpose of storing mountain heights"      ← about mountains, not programming
+- "Understanding data organisation"          ← too vague, not technical
+- "Analysing the need for ordering"          ← about the problem, not the skill
+- "Evaluating output clarity"               ← too abstract
+
+Questions CAN use the assignment's scenario for context (e.g. "In your mountain
+program, why did you use an array?"), but the COMPETENCY being tested must always
+be a technical programming concept (e.g. "Using arrays to store multiple values").
+
+═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
 ═══════════════════════════════════════════════════════════════
 
@@ -163,6 +190,22 @@ VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
 - Think: "Can a beginner explain this in 15 seconds of speaking?"
 
 ═══════════════════════════════════════════════════════════════
+CONCEPTUAL UNDERSTANDING — NO SYNTAX RECALL
+═══════════════════════════════════════════════════════════════
+
+Competencies must test UNDERSTANDING of programming concepts, NOT recall of:
+- Language keywords (int, float, void, etc.)
+- Syntax rules (semicolons, brackets, etc.)
+- Data type names or function signatures
+- Method names or API details
+- Domain facts (mountain heights, student scores, etc.)
+
+GOOD: competency = "Using arrays to store multiple values"
+      question = "Why did you use an array in your program instead of separate variables?"
+BAD:  competency = "Purpose of storing mountain heights"
+      question = "Why do we need to save the heights of mountains?"
+
+═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY RULES (follow these EXACTLY)
 ═══════════════════════════════════════════════════════════════
 
@@ -173,36 +216,38 @@ Use the EXACT difficulty_level integer AND the EXACT level_label string shown be
 │ difficulty_level │ level_label        │ Permitted action verbs & what to assess                         │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 1               │ "Remember"         │ DEFINE, NAME, RECALL, STATE                                     │
-│                 │                    │ Student recalls ONE simple fact, term, or definition.            │
-│                 │                    │ Example Q: "What data type stores decimal numbers?"              │
-│                 │                    │ Example Q: "What keyword creates a structure in C++?"            │
+│                 │                    │ Student recalls the PURPOSE of a programming concept.            │
+│                 │                    │ Example Q: "What does an array let you do in a program?"         │
+│                 │                    │ Example Q: "What is the purpose of reading input from the user?" │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE                                    │
-│                 │                    │ Student explains ONE concept in their own words (1-2 sentences). │
-│                 │                    │ Example Q: "In your own words, what is a function?"              │
-│                 │                    │ Example Q: "Why do we use variables?"                            │
+│                 │                    │ Student explains ONE programming concept in their own words.     │
+│                 │                    │ Example Q: "Why would you use an array instead of separate variables?" │
+│                 │                    │ Example Q: "In your own words, why is sorting useful?"           │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 3               │ "Apply"            │ DEMONSTRATE (verbally), SOLVE, USE                              │
-│                 │                    │ Student describes how they'd handle a SIMPLE scenario.           │
-│                 │                    │ Example Q: "If the radius is 5, how do you calculate the area?"  │
-│                 │                    │ Example Q: "What happens if someone enters a negative number?"   │
+│                 │                    │ Student describes how they'd apply a concept in a scenario.      │
+│                 │                    │ Example Q: "How would you find the largest value in an array?"   │
+│                 │                    │ Example Q: "What would you do if the user entered invalid input?"│
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 4               │ "Analyse"          │ COMPARE, DIFFERENTIATE, EXPLAIN WHY                             │
-│                 │                    │ Student identifies ONE difference or trade-off.                  │
-│                 │                    │ Example Q: "Why use a double instead of an int for radius?"      │
-│                 │                    │ Example Q: "What is one benefit of using functions?"             │
+│                 │                    │ Student identifies ONE difference or trade-off between approaches│
+│                 │                    │ Example Q: "What's the difference between sorting and just finding the max?" │
+│                 │                    │ Example Q: "Why might you choose a loop over writing each step separately?" │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, SUGGEST                                     │
-│                 │                    │ Student makes ONE simple judgment or improvement suggestion.     │
-│                 │                    │ Example Q: "What would you improve about your program?"          │
-│                 │                    │ Example Q: "If you needed more shapes, what would you change?"   │
+│                 │                    │ Student makes ONE judgment or improvement suggestion.            │
+│                 │                    │ Example Q: "How would you change your program if you needed more values?" │
+│                 │                    │ Example Q: "What would you improve about how your program handles errors?" │
 └─────────────────┴────────────────────┴──────────────────────────────────────────────────────────────────┘
 
 IMPORTANT CONSTRAINTS:
 - Generate EXACTLY 5 criteria — one for EACH Bloom's level (1 through 5). No more, no less.
 - Every criterion's level_description must contain 2-3 example VERBAL QUESTIONS that are SHORT (under 25 words each).
+- The competency MUST be a TECHNICAL PROGRAMMING SKILL — never a domain-specific concept.
+- Questions MAY reference the assignment's scenario for familiarity, but the skill tested must be technical.
 - The marking_criteria must describe what the assessor LISTENS FOR — keep it beginner-appropriate.
-- Each criterion must target a DIFFERENT competency relevant to the assignment.
+- Each criterion must target a DIFFERENT technical competency from the assignment.
 - Every criterion must be assessable through 1-2 simple spoken sentences from the student.
 
 For each grading criterion provide:
@@ -215,19 +260,19 @@ For each grading criterion provide:
 NOTE: All questions are scored out of a FIXED 10 points. Do NOT include max_points in criteria.
 
 OUTPUT FORMAT (JSON only, no other text):
-{{
+{{{{
   "programming_language": "C++",
   "learning_objectives": ["objective 1", "objective 2"],
   "criteria": [
-    {{
+    {{{{
       "competency": "...",
       "difficulty_level": 2,
       "level_label": "Understand",
       "level_description": "Explain what ... / Describe why ...",
       "marking_criteria": "Full marks: student clearly explains... Partial: mentions but cannot elaborate... No marks: cannot answer."
-    }}
+    }}}}
   ]
-}}
+}}}}
 
 Return ONLY valid JSON. Generate EXACTLY 5 criteria — one per Bloom's level — covering key competencies from the assignment.""".strip()
 
