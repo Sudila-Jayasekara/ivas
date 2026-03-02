@@ -96,6 +96,11 @@ class StudentResponse(Base):
     feedback_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     detected_misconceptions: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
+    # --- LLM layer outputs ---
+    input_classification: Mapped[str | None] = mapped_column(String, nullable=True)      # abuse | non_answer | genuine_attempt
+    score_justification: Mapped[str | None] = mapped_column(Text, nullable=True)          # LLM explanation of why this score was given
+    deep_analysis: Mapped[dict | None] = mapped_column(JSONB, nullable=True)              # Background deep analysis results
+
 
 class ResponseCompetencyLink(Base):
     __tablename__ = "response_competency_links"
