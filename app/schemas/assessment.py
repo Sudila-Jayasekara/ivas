@@ -88,6 +88,8 @@ class StudentResponseOut(BaseModel):
     evaluation_score: float | None = None
     feedback_text: str | None = None
     detected_misconceptions: list[str] | None = None
+    input_classification: str | None = None
+    score_justification: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -152,6 +154,7 @@ class ExchangeOut(BaseModel):
     evaluation_score: float | None = None
     feedback_text: str | None = None
     detected_misconceptions: list[str] | None = None
+    score_justification: str | None = None
     is_follow_up: bool = False
     question_type: str = "new"  # "new" | "follow_up" | "re_ask"
 
