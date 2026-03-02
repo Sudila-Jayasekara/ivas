@@ -21,6 +21,7 @@ class QuestionWithContext(BaseModel):
     code_context: str = ""
     hint: str = ""
     is_follow_up: bool = False
+    question_type: str = "new"  # "new" | "follow_up" | "re_ask"
 
 
 # --- Trigger ---
@@ -152,6 +153,7 @@ class ExchangeOut(BaseModel):
     feedback_text: str | None = None
     detected_misconceptions: list[str] | None = None
     is_follow_up: bool = False
+    question_type: str = "new"  # "new" | "follow_up" | "re_ask"
 
 
 class AssessmentTranscriptOut(BaseModel):

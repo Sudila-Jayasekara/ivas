@@ -12,6 +12,7 @@ questions and evaluating answers. This service:
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
@@ -43,6 +44,36 @@ from app.schemas.assessment import (
 from app.services.evaluation_service import evaluation_service
 
 logger = logging.getLogger(__name__)
+
+# --- Session & question flow limits ---
+MAX_TOTAL_EXCHANGES = 25        # Hard cap on total exchanges in a session
+MAX_EXCHANGES_PER_QUESTION = 3  # Max exchanges (root + follow-ups + re-asks) per bank question
+MAX_FOLLOW_UP_DEPTH = 1         # Max Socratic follow-ups per question chain
+MAX_REASK_COUNT = 1             # Max re-asks for low-score responses
+
+# --- Abuse detection patterns ---
+_ABUSE_PATTERN = re.compile(
+    r'\b(?:fuck|shit|bitch|ass(?:hole)?|damn|dick|cunt|bastard|idiot|stupid|'
+    r'your\s+(?:mother|mom|mum|dad|father|sister|family)|'
+    r'go\s+(?:to\s+hell|die|away)|kill\s+yourself|'
+    r'shut\s+(?:up|the\s+fuck)|suck\s+(?:my|it)|screw\s+you)\b',
+    re.IGNORECASE,
+)
+
+# --- Non-answer detection patterns (anchored: must match full response) ---
+_NON_ANSWER_PATTERN = re.compile(
+    r'^\s*(?:'
+    r'yes|no|yeah|nah|yep|nope|ok|okay|sure|maybe|idk|dunno|hmm?|uh+|um+'
+    r'|i\s+don.?t\s+know(?:\s+(?:it|that|this))?'
+    r'|i\s+(?:already\s+)?(?:answer(?:ed)?|said|told)(?:\s+(?:it|that|this|before|already))*'
+    r'|not\s+sure|no\s+idea|no\s+clue'
+    r'|i\s+(?:have\s+)?no\s+(?:idea|clue)'
+    r'|pass|skip|next'
+    r'|i\s+(?:guess|think)\s+(?:so|yes|no|not)'
+    r'|(?:actually\s+)?i.?m\s+not\s+sure(?:\s+(?:about\s+)?(?:it|that|this))?'
+    r')\s*[.!?]*\s*$',
+    re.IGNORECASE,
+)
 
 
 class AssessmentService:
@@ -121,6 +152,186 @@ class AssessmentService:
             })
         session_obj.competency_summary = summary
         await self.session.flush()
+
+    # ------------------------------------------------------------------
+    # Input validation helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_abusive(text: str) -> bool:
+        """Detect profanity or abusive language in student response."""
+        if not text or not text.strip():
+            return False
+        return bool(_ABUSE_PATTERN.search(text))
+
+    @staticmethod
+    def _is_non_answer(text: str) -> bool:
+        """Detect non-answers that show zero conceptual understanding."""
+        if not text or not text.strip():
+            return True  # empty / whitespace = non-answer
+        return bool(_NON_ANSWER_PATTERN.search(text.strip()))
+
+    # ------------------------------------------------------------------
+    # Exchange counting helpers
+    # ------------------------------------------------------------------
+
+    async def _count_total_exchanges(self, session_id: str) -> int:
+        """Count total responses (exchanges) in the session."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(StudentResponse)
+            .where(StudentResponse.session_id == session_id)
+        )
+        return result.scalar() or 0
+
+    async def _count_exchanges_for_question(
+        self, session_id: str, instance: AssessmentQuestionInstance
+    ) -> int:
+        """Count total exchanges for the same bank question chain."""
+        root_id = instance.parent_instance_id or instance.id
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(AssessmentQuestionInstance)
+            .where(
+                AssessmentQuestionInstance.session_id == session_id,
+                (AssessmentQuestionInstance.id == root_id)
+                | (AssessmentQuestionInstance.parent_instance_id == root_id),
+            )
+        )
+        return result.scalar() or 0
+
+    async def _count_reasks_for_question(
+        self, session_id: str, instance: AssessmentQuestionInstance
+    ) -> int:
+        """Count re-asks (depth=0 children) for the same bank question chain."""
+        root_id = instance.parent_instance_id or instance.id
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(AssessmentQuestionInstance)
+            .where(
+                AssessmentQuestionInstance.session_id == session_id,
+                AssessmentQuestionInstance.parent_instance_id == root_id,
+                AssessmentQuestionInstance.follow_up_depth == 0,
+            )
+        )
+        return result.scalar() or 0
+
+    # ------------------------------------------------------------------
+    # Advance to next bank question (or complete session)
+    # ------------------------------------------------------------------
+
+    async def _advance_to_next_question(
+        self,
+        session_id: str,
+        session_obj: AssessmentSession,
+        resp: StudentResponse,
+        now: datetime,
+    ) -> SubmitResponseResponse:
+        """Move to the next bank question, or complete the session if done."""
+        # Count root (bank) questions asked so far
+        count_result = await self.session.execute(
+            select(func.count())
+            .select_from(AssessmentQuestionInstance)
+            .where(
+                AssessmentQuestionInstance.session_id == session_id,
+                AssessmentQuestionInstance.parent_instance_id.is_(None),
+            )
+        )
+        asked_count = count_result.scalar() or 0
+
+        if asked_count >= 3:
+            session_obj.status = "completed"
+            session_obj.completed_at = now
+            await self._compute_session_scores(session_obj)
+            await self.session.flush()
+            return SubmitResponseResponse(
+                response_id=resp.id,
+                is_complete=True,
+                message="Assessment completed",
+                evaluation_score=resp.evaluation_score,
+                feedback_text=resp.feedback_text,
+                detected_misconceptions=resp.detected_misconceptions,
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
+            )
+
+        # Get already-asked question IDs
+        asked_result = await self.session.execute(
+            select(AssessmentQuestionInstance.question_id).where(
+                AssessmentQuestionInstance.session_id == session_id
+            )
+        )
+        asked_ids = [row[0] for row in asked_result.all()]
+
+        # Find next approved question
+        next_q_result = await self.session.execute(
+            select(Question)
+            .where(
+                Question.assignment_id == session_obj.assignment_id,
+                Question.status == "approved",
+                Question.id.notin_(asked_ids),
+            )
+            .order_by(Question.difficulty.asc())
+            .limit(1)
+        )
+        next_question = next_q_result.scalar_one_or_none()
+
+        if next_question is None:
+            session_obj.status = "completed"
+            session_obj.completed_at = now
+            await self._compute_session_scores(session_obj)
+            await self.session.flush()
+            return SubmitResponseResponse(
+                response_id=resp.id,
+                is_complete=True,
+                message="No more questions available. Assessment completed.",
+                evaluation_score=resp.evaluation_score,
+                feedback_text=resp.feedback_text,
+                detected_misconceptions=resp.detected_misconceptions,
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
+            )
+
+        seq_result = await self.session.execute(
+            select(func.count())
+            .select_from(AssessmentQuestionInstance)
+            .where(AssessmentQuestionInstance.session_id == session_id)
+        )
+        total_instances = seq_result.scalar() or 0
+
+        new_instance_id = str(uuid4())
+        new_instance = AssessmentQuestionInstance(
+            id=new_instance_id,
+            session_id=session_id,
+            question_id=next_question.id,
+            sequence_number=total_instances + 1,
+            asked_at=now,
+            competency=next_question.competency or "",
+            difficulty=next_question.difficulty,
+        )
+        self.session.add(new_instance)
+        await self.session.flush()
+
+        next_ctx = QuestionWithContext(
+            question_id=next_question.id,
+            question_instance_id=new_instance_id,
+            question_text=next_question.question_text,
+            competency=next_question.competency or "",
+            difficulty=next_question.difficulty,
+            code_context=session_obj.code_context or "",
+            question_type="new",
+        )
+
+        return SubmitResponseResponse(
+            response_id=resp.id,
+            next_question=next_ctx,
+            is_complete=False,
+            evaluation_score=resp.evaluation_score,
+            feedback_text=resp.feedback_text,
+            detected_misconceptions=resp.detected_misconceptions,
+        )
 
     # ------------------------------------------------------------------
     # Trigger
@@ -237,6 +448,18 @@ class AssessmentService:
 
         response_time = int((now - instance.asked_at).total_seconds())
 
+        # Fetch question object (needed for all paths)
+        question_result = await self.session.execute(
+            select(Question).where(Question.id == instance.question_id)
+        )
+        question_obj = question_result.scalar_one_or_none()
+
+        # Determine the question text that was actually asked
+        asked_text = instance.follow_up_question_text or (
+            question_obj.question_text if question_obj else ""
+        )
+
+        # Create response record (always, for audit trail)
         resp = StudentResponse(
             id=str(uuid4()),
             question_instance_id=question_instance_id,
@@ -251,17 +474,47 @@ class AssessmentService:
         self.session.add(resp)
         await self.session.flush()
 
+        # --- Global exchange cap ---
+        total_exchanges = await self._count_total_exchanges(session_id)
+        if total_exchanges >= MAX_TOTAL_EXCHANGES:
+            resp.evaluation_score = 0.0
+            resp.feedback_text = "Session exchange limit reached."
+            session_obj.status = "completed"
+            session_obj.completed_at = now
+            await self._compute_session_scores(session_obj)
+            await self.session.flush()
+            return SubmitResponseResponse(
+                response_id=resp.id,
+                is_complete=True,
+                message="Assessment completed — exchange limit reached.",
+                evaluation_score=0.0,
+                feedback_text="Session exchange limit reached.",
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
+            )
+
+        # --- Abuse detection (skip LLM, score 0, advance) ---
+        if self._is_abusive(response_text):
+            resp.evaluation_score = 0.0
+            resp.feedback_text = "Inappropriate response. Score: 0."
+            resp.detected_misconceptions = []
+            await self.session.flush()
+            return await self._advance_to_next_question(
+                session_id, session_obj, resp, now
+            )
+
+        # --- Non-answer detection (skip LLM, score 0, advance) ---
+        if self._is_non_answer(response_text):
+            resp.evaluation_score = 0.0
+            resp.feedback_text = "No substantive answer provided. Score: 0."
+            resp.detected_misconceptions = []
+            await self.session.flush()
+            return await self._advance_to_next_question(
+                session_id, session_obj, resp, now
+            )
+
         # --- LLM Evaluation ---
-        question_result = await self.session.execute(
-            select(Question).where(Question.id == instance.question_id)
-        )
-        question_obj = question_result.scalar_one_or_none()
-
-        # Determine the question text that was actually asked
-        asked_text = instance.follow_up_question_text or (
-            question_obj.question_text if question_obj else ""
-        )
-
         eval_result = None
         if question_obj:
             eval_result = await asyncio.to_thread(
@@ -291,20 +544,16 @@ class AssessmentService:
                 self.session.add(link)
             await self.session.flush()
 
-        # Count only root (bank) questions toward the session limit
-        count_result = await self.session.execute(
-            select(func.count())
-            .select_from(AssessmentQuestionInstance)
-            .where(
-                AssessmentQuestionInstance.session_id == session_id,
-                AssessmentQuestionInstance.parent_instance_id.is_(None),
-            )
+        # --- Per-question exchange cap ---
+        question_exchanges = await self._count_exchanges_for_question(
+            session_id, instance
         )
-        asked_count = count_result.scalar() or 0
+        if question_exchanges >= MAX_EXCHANGES_PER_QUESTION:
+            return await self._advance_to_next_question(
+                session_id, session_obj, resp, now
+            )
 
-        # --- Socratic follow-up check ---
-        MAX_FOLLOW_UP_DEPTH = 2
-
+        # --- Socratic follow-up check (30-79% score) ---
         should_follow_up = (
             eval_result is not None
             and question_obj is not None
@@ -326,10 +575,7 @@ class AssessmentService:
             )
 
             if follow_up_text:
-                # Determine root instance for the chain
                 root_id = instance.parent_instance_id or instance.id
-
-                # Get current total sequence number
                 seq_result = await self.session.execute(
                     select(func.count())
                     .select_from(AssessmentQuestionInstance)
@@ -341,7 +587,7 @@ class AssessmentService:
                 fu_instance = AssessmentQuestionInstance(
                     id=fu_instance_id,
                     session_id=session_id,
-                    question_id=instance.question_id,  # same bank question
+                    question_id=instance.question_id,
                     sequence_number=total_instances + 1,
                     asked_at=now,
                     competency=instance.competency,
@@ -361,6 +607,7 @@ class AssessmentService:
                     difficulty=instance.difficulty,
                     code_context=session_obj.code_context or "",
                     is_follow_up=True,
+                    question_type="follow_up",
                 )
 
                 return SubmitResponseResponse(
@@ -372,92 +619,63 @@ class AssessmentService:
                     detected_misconceptions=resp.detected_misconceptions,
                 )
 
-        # --- Normal flow: check completion or pick next bank question ---
+        # --- Re-ask check (score < 30%) ---
+        if eval_result and question_obj:
+            max_pts = float(question_obj.max_points) if question_obj.max_points > 0 else 10.0
+            score_pct = eval_result.score / max_pts
+            if score_pct < 0.3:
+                reask_count = await self._count_reasks_for_question(
+                    session_id, instance
+                )
+                if reask_count < MAX_REASK_COUNT:
+                    root_id = instance.parent_instance_id or instance.id
+                    seq_result = await self.session.execute(
+                        select(func.count())
+                        .select_from(AssessmentQuestionInstance)
+                        .where(AssessmentQuestionInstance.session_id == session_id)
+                    )
+                    total_instances = seq_result.scalar() or 0
 
-        if asked_count >= 3:
-            session_obj.status = "completed"
-            session_obj.completed_at = now
-            await self._compute_session_scores(session_obj)
-            await self.session.flush()
-            return SubmitResponseResponse(
-                response_id=resp.id,
-                is_complete=True,
-                message="Assessment completed",
-                evaluation_score=resp.evaluation_score,
-                feedback_text=resp.feedback_text,
-                detected_misconceptions=resp.detected_misconceptions,
-                final_score=session_obj.final_score,
-                max_score=session_obj.max_score,
-                competency_summary=session_obj.competency_summary,
-            )
+                    reask_instance_id = str(uuid4())
+                    reask_instance = AssessmentQuestionInstance(
+                        id=reask_instance_id,
+                        session_id=session_id,
+                        question_id=instance.question_id,
+                        sequence_number=total_instances + 1,
+                        asked_at=now,
+                        competency=instance.competency,
+                        difficulty=instance.difficulty,
+                        follow_up_depth=0,
+                        parent_instance_id=root_id,
+                        follow_up_question_text=question_obj.question_text,
+                    )
+                    self.session.add(reask_instance)
+                    await self.session.flush()
 
-        # Get already asked question IDs
-        asked_result = await self.session.execute(
-            select(AssessmentQuestionInstance.question_id).where(
-                AssessmentQuestionInstance.session_id == session_id
-            )
-        )
-        asked_ids = [row[0] for row in asked_result.all()]
+                    next_ctx = QuestionWithContext(
+                        question_id=instance.question_id,
+                        question_instance_id=reask_instance_id,
+                        question_text=question_obj.question_text,
+                        competency=instance.competency,
+                        difficulty=instance.difficulty,
+                        code_context=session_obj.code_context or "",
+                        is_follow_up=True,
+                        question_type="re_ask",
+                    )
 
-        # Find next question
-        next_q_result = await self.session.execute(
-            select(Question)
-            .where(
-                Question.assignment_id == session_obj.assignment_id,
-                Question.status == "approved",
-                Question.id.notin_(asked_ids),
-            )
-            .order_by(Question.difficulty.asc())
-            .limit(1)
-        )
-        next_question = next_q_result.scalar_one_or_none()
+                    return SubmitResponseResponse(
+                        response_id=resp.id,
+                        next_question=next_ctx,
+                        is_complete=False,
+                        message="Let's try this question again. Take your time and give it your best shot.",
+                        evaluation_score=resp.evaluation_score,
+                        feedback_text=resp.feedback_text,
+                        detected_misconceptions=resp.detected_misconceptions,
+                    )
 
-        if next_question is None:
-            session_obj.status = "completed"
-            session_obj.completed_at = now
-            await self._compute_session_scores(session_obj)
-            await self.session.flush()
-            return SubmitResponseResponse(
-                response_id=resp.id,
-                is_complete=True,
-                message="No more questions available. Assessment completed.",
-                evaluation_score=resp.evaluation_score,
-                feedback_text=resp.feedback_text,
-                detected_misconceptions=resp.detected_misconceptions,
-                final_score=session_obj.final_score,
-                max_score=session_obj.max_score,
-                competency_summary=session_obj.competency_summary,
-            )
-
-        new_instance_id = str(uuid4())
-        new_instance = AssessmentQuestionInstance(
-            id=new_instance_id,
-            session_id=session_id,
-            question_id=next_question.id,
-            sequence_number=asked_count + 1,
-            asked_at=now,
-            competency=next_question.competency or "",
-            difficulty=next_question.difficulty,
-        )
-        self.session.add(new_instance)
-        await self.session.flush()
-
-        next_ctx = QuestionWithContext(
-            question_id=next_question.id,
-            question_instance_id=new_instance_id,
-            question_text=next_question.question_text,
-            competency=next_question.competency or "",
-            difficulty=next_question.difficulty,
-            code_context=session_obj.code_context or "",
-        )
-
-        return SubmitResponseResponse(
-            response_id=resp.id,
-            next_question=next_ctx,
-            is_complete=False,
-            evaluation_score=resp.evaluation_score,
-            feedback_text=resp.feedback_text,
-            detected_misconceptions=resp.detected_misconceptions,
+        # --- Normal flow: advance to next bank question ---
+        return await self._advance_to_next_question(
+            session_id, session_obj, resp, now
         )
 
     # ------------------------------------------------------------------
@@ -651,12 +869,21 @@ class AssessmentService:
                 question.question_text if question else ""
             )
 
+            # Determine question_type: new / follow_up / re_ask
+            if inst.parent_instance_id is None:
+                q_type = "new"
+            elif inst.follow_up_depth > 0:
+                q_type = "follow_up"
+            else:
+                q_type = "re_ask"
+
             exchange = ExchangeOut(
                 question_text=display_text,
                 competency=inst.competency,
                 difficulty=inst.difficulty,
                 asked_at=inst.asked_at,
                 is_follow_up=inst.parent_instance_id is not None,
+                question_type=q_type,
             )
 
             resp = response_map.get(inst.id)

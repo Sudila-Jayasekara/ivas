@@ -57,7 +57,7 @@ The student answered by SPEAKING into a microphone and their speech was converte
 - If they clearly understand the concept but the transcription is messy, give credit
 - Technical terms may be misspelled or wrong (e.g. "struck" instead of "struct", "dubble" instead of "double")
 - Filler words, repetitions, and awkward phrasing are NORMAL for spoken answers
-- Be GENEROUS with partial credit — this is a beginner student speaking, not writing
+- Give fair credit for genuine attempts — this is a beginner student speaking, not writing
 
 QUESTION: {question_text}
 EXPECTED CONCEPTUAL ANSWER: {expected_answer}
@@ -67,7 +67,13 @@ COMPETENCY BEING ASSESSED: {competency}
 DIFFICULTY: {difficulty}/5
 MAX POINTS: {max_points}
 
-EVALUATION RULES (focus on CONCEPTUAL UNDERSTANDING):
+ZERO-SCORE RULES (apply these FIRST, before any other scoring):
+- If the answer contains profanity, insults, or abusive language → score 0.0. No partial credit.
+- If the answer is a non-answer with no conceptual content (e.g. "yes", "no", "I don't know", "I already answered", "not sure") → score 0.0.
+- If the answer is a meta-comment ABOUT the question rather than an answer TO the question (e.g. "why are you asking about apples", "how is this related", "what kind of question is this") → score 0.0.
+- If the answer is fewer than 5 words and contains no technical or conceptual content → score 0.0.
+
+SCORING RULES (for genuine attempts that pass ZERO-SCORE checks above):
 1. Score from 0.0 to {max_points}.0 based on how well the student UNDERSTANDS the concept.
 2. Award high marks if the student can explain the concept in their own words, relate it to real-world use, or describe WHY it matters — even if their wording is imperfect.
 3. Award partial credit if they show partial understanding (e.g. they know WHAT a struct is but not WHY you'd use one).
@@ -218,11 +224,12 @@ COMPETENCY: {competency}
 
 RULES:
 1. Ask exactly ONE concise follow-up question (1-2 sentences).
-2. The question should probe CONCEPTUAL understanding — ask WHY something works, WHEN you'd use it, or HOW it relates to a real-world scenario.
+2. The question should probe CONCEPTUAL understanding — ask WHY something works, WHEN you'd use it, or HOW it applies in a real program.
 3. Do NOT ask them to write or recite code.
 4. Do NOT reveal the answer — help them think through the concept.
 5. Keep it conversational and encouraging.
-6. Good follow-ups: "Why would that matter in a real program?" / "Can you think of a situation where that wouldn't work?"
+6. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza). Keep examples directly related to programming.
+7. Good follow-ups: "Why would that matter in a real program?" / "Can you think of a situation where that wouldn't work?"
 
 Return ONLY the follow-up question text, nothing else.""".strip()
 

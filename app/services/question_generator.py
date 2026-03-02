@@ -118,9 +118,10 @@ Level 2 — "Understand":
   → Example: "Can you explain what a loop does and why it's useful?"
 
 Level 3 — "Apply":
-  → Give a SIMPLE real-world scenario and ask how they'd use the concept.
+  → Give a SIMPLE, DIRECTLY RELEVANT scenario and ask how they'd use the concept.
+  → The scenario MUST be a realistic programming situation (building an app, processing data, etc.).
   → Example: "If you were building a student record system, how would you organise the data?"
-  → Example: "How would you use a loop to solve a real-world counting problem?"
+  → Example: "How would you use a loop to process a list of student grades?"
 
 Level 4 — "Analyse":
   → Ask ONE comparison, trade-off, or "why would you choose" question.
@@ -140,6 +141,8 @@ CRITICAL RULES:
 5. Do NOT ask multi-part questions. ONE question, ONE thing to answer.
 6. Do NOT require code syntax in the answer. Accept conceptual explanations.
 7. All questions are scored out of 10 points — do NOT include max_points in output.
+8. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.). If you use an example or scenario, it MUST be directly related to programming or the specific competency. Ask about the concept DIRECTLY — e.g. "Why would you use a variable?" NOT "Imagine you're collecting apples in baskets...".
+9. Keep examples in the PROGRAMMING DOMAIN — use scenarios like building apps, processing data, managing records, etc.
 
 OUTPUT FORMAT (JSON array with exactly 2 items, no other text):
 [
