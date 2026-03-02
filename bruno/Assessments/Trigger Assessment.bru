@@ -25,8 +25,10 @@ body:json {
 script:post-response {
   const data = res.getBody();
   
+  if(data.session_id && data.first_question.question_instance_id){
   bru.setVar("session_id", data.session_id);
   bru.setVar("question_instance_id", data.first_question.question_instance_id);
+  }
 }
 
 docs {
