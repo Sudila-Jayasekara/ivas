@@ -29,7 +29,7 @@ class QuestionService:
     # ------------------------------------------------------------------
 
     async def generate_questions(
-        self, assignment_id: str, criteria_id: str | None = None
+        self, assignment_id: str, criteria_id: str | None = None, assignment_text: str = ""
     ) -> dict:
         """Generate questions from grading criteria.
 
@@ -79,6 +79,7 @@ class QuestionService:
         ai_questions = await asyncio.to_thread(
             question_generator.generate_questions,
             criteria_rows=criteria_dicts,
+            assignment_text=assignment_text,
         )
 
         question_ids: list[str] = []
