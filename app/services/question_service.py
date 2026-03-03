@@ -29,7 +29,7 @@ class QuestionService:
     # ------------------------------------------------------------------
 
     async def generate_questions(
-        self, assignment_id: str, criteria_id: str | None = None, assignment_text: str = ""
+        self, assignment_id: str, criteria_id: str | None = None, assignment_text: str = "", num_questions: int | None = None
     ) -> dict:
         """Generate questions from grading criteria.
 
@@ -80,6 +80,7 @@ class QuestionService:
             question_generator.generate_questions,
             criteria_rows=criteria_dicts,
             assignment_text=assignment_text,
+            num_questions=num_questions,
         )
 
         question_ids: list[str] = []
