@@ -70,18 +70,12 @@ You MUST cover ALL important aspects of this competency. Do not skip any"""
         if assignment_text:
             assignment_section = f"""
 ═══════════════════════════════════════════════════════════════
-ASSIGNMENT REFERENCE — FOR CONTEXT ONLY
+ASSIGNMENT CONTEXT — FOR LIGHT REFERENCE ONLY
 ═══════════════════════════════════════════════════════════════
 
-The student completed THIS assignment. The assignment uses a SCENARIO
-(e.g. mountains, students, books) as a vehicle for teaching programming.
-You MAY reference the scenario to make questions feel familiar, but the
-question MUST test the TECHNICAL PROGRAMMING COMPETENCY, not domain knowledge.
-
-GOOD: "In your mountain program, why did you use an array instead of separate variables?"
-  → Tests: arrays (technical)
-BAD: "Why do we need to save the heights of mountains?"
-  → Tests: mountains (domain)
+The student completed this assignment. You MAY lightly reference the scenario
+to make questions feel familiar, but the question MUST primarily test the
+TECHNICAL CONCEPT "{competency}" — NOT the assignment's domain/scenario.
 
 ASSIGNMENT:
 \"\"\"
@@ -91,9 +85,9 @@ ASSIGNMENT:
 
         return f"""You are an expert instructor creating oral viva questions for BEGINNER students.
 
-PURPOSE: These questions check whether the student UNDERSTANDS what they did in their
-assignment and WHY their code works. Questions must be SPECIFIC to the assignment — 
-not generic programming philosophy.
+PURPOSE: These questions check whether the student UNDERSTANDS the technical
+CONCEPT behind what they did — WHY it works, WHEN to use it, and HOW it
+behaves. You are NOT checking if they can describe what their program does.
 
 {count_instruction} for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
 {assignment_section}
@@ -106,34 +100,56 @@ CONTEXT:
 - Learning Objectives: {objectives}
 
 ═══════════════════════════════════════════════════════════════
-QUESTION QUALITY — SPECIFIC, NOT VAGUE
+THE GOLDEN RULE — TEST THE CONCEPT, NOT THE SCENARIO
 ═══════════════════════════════════════════════════════════════
 
-Questions MUST be SPECIFIC to the assignment. They should reference what the
-student ACTUALLY DID — the data they worked with, the steps their program takes,
-the output it produces. NEVER ask generic "why does this concept exist?" questions.
+Every assignment uses a SCENARIO (balls, mountains, students, etc.) to teach
+a TECHNICAL CONCEPT (loops, arrays, conditionals, etc.). Your questions MUST
+test whether the student understands the CONCEPT — not the scenario.
 
-GOOD questions (specific, grounded in the assignment):
-- "Your program reads 10 numbers — where do those numbers go after reading them?"
-- "After sorting the heights, how does your program pick just the top 3?"
-- "What would happen if two mountains had the same height in your program?"
-- "If you added an 11th mountain, what would you need to change?"
+Ask yourself: "Would this question still make sense if the scenario changed
+but the same programming concept was used?" If YES → good question.
+If NO → you're testing the scenario, rewrite it.
 
-BAD questions (vague, philosophical — NEVER generate these):
-- "Why do programs need to get information from the user?" ← too obvious, no depth
-- "What is the main purpose of reading input?" ← generic, not specific to assignment
-- "Imagine you're building a program. Why might you need a number?" ← philosophical
-- "Why would you use an array?" ← generic, not grounded in what they did
+GOOD questions (test the CONCEPT — survive scenario changes):
+- "Why did you use a for-loop here instead of a while-loop?"
+  → Tests: understanding of loop types (works regardless of scenario)
+- "What would happen if your loop condition was never true?"
+  → Tests: understanding of loop mechanics
+- "Why did you need an array instead of a single variable?"
+  → Tests: understanding of when arrays are needed
+- "What's the difference between passing by value and by reference?"
+  → Tests: understanding of parameter passing
 
-The difference: GOOD questions make the student think about THEIR specific program.
-BAD questions sound like textbook definitions anyone could answer without doing the assignment.
+BAD questions (test the SCENARIO — break if scenario changes):
+- "Why do we need to count the red balls?"
+  → Tests: the scenario, not the loop concept
+- "What does your program output when given 10 mountain heights?"
+  → Tests: specific program behavior, not understanding
+- "Why is it important to track student grades?"
+  → Tests: domain knowledge, not programming skill
+- "What is the main purpose of reading input?"
+  → Too generic, doesn't test any specific concept
 
-Do NOT:
-- Ask students to write, recite, or describe code syntax
-- Ask "what is the output of this code?"
-- Ask about syntax details (semicolons, brackets, etc.)
-- Test memorisation of function names or data type names
-- Ask generic "why does X exist in programming?" questions
+The difference: GOOD questions have a definitive technical answer about
+the programming concept. BAD questions are about the scenario or so generic
+that anyone could answer without understanding the concept.
+
+═══════════════════════════════════════════════════════════════
+EXPECTED ANSWERS — MUST DEMONSTRATE CONCEPTUAL UNDERSTANDING
+═══════════════════════════════════════════════════════════════
+
+The expected_answer MUST be a conceptual explanation of the TECHNICAL CONCEPT.
+It should show understanding of WHY/WHEN/HOW the concept works — not describe
+what the student's specific program does.
+
+GOOD expected answer (for "Why a for-loop instead of while-loop?"):
+"A for-loop is better when you know exactly how many times to repeat. Since
+we know there are 10 items, a for-loop handles the counting automatically."
+
+BAD expected answer:
+"The program reads 10 mountain heights and stores them in an array."
+(This describes WHAT the program does, not WHY the concept was used.)
 
 ═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — THIS IS A SPOKEN ASSESSMENT
@@ -157,50 +173,49 @@ The question MUST match the Bloom's level "{level_label}" (difficulty {difficult
 Follow these rules STRICTLY:
 
 Level 1 — "Remember":
-  → Ask the student to recall a SPECIFIC fact about their program.
-  → Reference something concrete from the assignment.
-  → Example: "In your program, where do the 10 numbers go after you read them?"
-  → Example: "How many numbers does your program read from the user?"
+  → Ask the student to recall a fact about the TECHNICAL CONCEPT they used.
+  → Example: "What type of loop did you use in your program?"
+  → Example: "What data structure did you use to store the values?"
 
 Level 2 — "Understand":
-  → Ask the student to EXPLAIN a specific decision in their program.
-  → Example: "Why did your program need to store all 10 heights instead of just reading one at a time?"
-  → Example: "After sorting, why are the top 3 heights at the end of the array?"
+  → Ask the student to EXPLAIN WHY they chose a specific technical approach.
+  → Example: "Why did you use a for-loop instead of a while-loop?"
+  → Example: "Why does your program need an array instead of separate variables?"
 
 Level 3 — "Apply":
-  → Ask how a specific part of their program works step by step.
-  → Example: "Walk me through how your program finds the 3 largest heights."
-  → Example: "What would your program do if the user entered a negative number?"
+  → Ask how the technical concept works step by step.
+  → Example: "What happens in your loop when it reaches the last iteration?"
+  → Example: "What would happen if you changed the loop to start from 1 instead of 0?"
 
 Level 4 — "Analyse":
-  → Ask to compare approaches or identify trade-offs in their solution.
-  → Example: "Could you find the top 3 heights without sorting? What would be different?"
-  → Example: "What's the difference between sorting all 10 and just picking the 3 biggest?"
+  → Ask to compare technical approaches or identify concept trade-offs.
+  → Example: "Could you solve this with a while-loop instead? What would change?"
+  → Example: "What's the trade-off between sorting first vs finding the max directly?"
 
 Level 5 — "Evaluate & Create":
-  → Ask the student to critique or propose improvements to their program.
-  → Example: "If the assignment asked for the top 5 instead of top 3, what would you change?"
-  → Example: "What would break in your program if two mountains had the same height?"
+  → Ask the student to critique or extend their technical approach.
+  → Example: "If you didn't know how many items there would be, how would your approach change?"
+  → Example: "What would break in your logic if the input was empty?"
 
 CRITICAL RULES:
-1. The question MUST be about "{competency}" specifically.
+1. The question MUST be about "{competency}" specifically — the TECHNICAL CONCEPT.
 2. The question MUST use the action verbs for "{level_label}" level ONLY.
 3. Maximum 30 words in the question — SHORT and DIRECT.
-4. The expected_answer must be a CONCEPTUAL explanation (not code) that a BEGINNER student would say in 1-3 spoken sentences (under 60 words). Use everyday language.
+4. The expected_answer must demonstrate CONCEPTUAL UNDERSTANDING (not describe program behavior) in 1-3 spoken sentences (under 60 words).
 5. Do NOT ask multi-part questions. ONE question, ONE thing to answer.
 6. Do NOT require code syntax in the answer. Accept conceptual explanations.
 7. All questions are scored out of 10 points — do NOT include max_points in output.
-8. Questions MUST test the TECHNICAL COMPETENCY — NOT domain knowledge. The question should test programming skills, not facts about mountains/students/etc.
+8. Questions MUST test the TECHNICAL CONCEPT — NOT domain/scenario knowledge.
 9. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.).
 10. {overlap_rule}
-11. LOGICAL COHERENCE: The question MUST logically relate to the actual code the student wrote and make total sense. Do NOT generate "stupid" or nonsensical questions.
-12. STRICT EXPECTED ANSWER MATCH: The expected answer MUST completely and accurately answer the question. Later upon evaluation, the model will strictly compare the student's spoken response against this expected answer.
+11. LOGICAL COHERENCE: The question must make sense in the context of the concept being tested.
+12. STRICT EXPECTED ANSWER MATCH: The expected answer must be a correct conceptual explanation that directly answers the question.
 
 OUTPUT FORMAT ({output_count_note}, no other text):
 [
   {{
     "question_text": "Your short question here (under 30 words)",
-    "expected_answer": "Brief expected response (under 60 words)..."
+    "expected_answer": "Brief conceptual explanation (under 60 words)..."
   }}
 ]
 

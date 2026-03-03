@@ -144,51 +144,91 @@ Map each criterion to a Bloom's level (1-5). Use as many different levels as app
         return f"""You are an expert university lecturer designing an ORAL VIVA assessment for BEGINNER students.
 The students will answer questions by SPEAKING into a microphone (speech-to-text).
 
-Analyse the following assignment text and produce grading criteria that:
-- Can ONLY be assessed through spoken conversation
-- Are appropriate for BEGINNER-level students
-- Lead to SHORT, SIMPLE questions answerable in 1-3 spoken sentences
-- Do NOT require reciting code syntax, writing code, or giving long technical explanations
-
 ASSIGNMENT TEXT:
 \"\"\"
 {assignment_text}
 \"\"\"
 
-From the assignment text above you must extract:
-1. The programming language used (e.g. "Python", "Java", "C++").
-2. A list of learning objectives the assignment addresses.
-3. A set of oral-viva grading criteria covering different competencies and Bloom's taxonomy levels.
-
-Each criterion must be designed so an assessor can probe student understanding purely through
-simple verbal questions. Students are BEGINNERS answering by VOICE — keep everything simple.
-
 ═══════════════════════════════════════════════════════════════
-EXTRACT TECHNICAL COMPETENCIES — NOT DOMAIN KNOWLEDGE
+STEP 1 (MOST IMPORTANT): IDENTIFY THE CORE TECHNICAL TOPIC(S)
 ═══════════════════════════════════════════════════════════════
 
-The assignment uses a SCENARIO (e.g. mountain heights, student grades, library books)
-as a vehicle for teaching PROGRAMMING CONCEPTS. Your job is to identify the
-TECHNICAL/PROGRAMMING competencies the assignment teaches — NOT domain knowledge.
+Before generating ANY criteria, you MUST first identify WHAT TECHNICAL CONCEPT(S)
+this assignment is designed to teach. Every assignment uses a SCENARIO (e.g. counting
+balls, managing students, sorting mountains) as a VEHICLE to teach one or more
+PROGRAMMING CONCEPTS.
 
-The competency field MUST name a TECHNICAL PROGRAMMING SKILL, not the scenario.
+Your job is to SEE THROUGH the scenario and identify the REAL topic:
 
-GOOD competencies (technical):
-- "Using arrays to store multiple values"
-- "Sorting data to find specific values"
-- "Reading input from the user"
-- "Comparing values to find the largest"
-- "Formatting program output"
+SCENARIO → REAL TECHNICAL TOPIC (examples):
+- "Count red and blue balls in a bag"       → LOOPS (iteration, counting patterns)
+- "Store and sort mountain heights"         → ARRAYS + SORTING ALGORITHMS
+- "Calculate student grade averages"        → LOOPS + ARITHMETIC OPERATIONS
+- "Build a library book tracker"            → OBJECT-ORIENTED PROGRAMMING (classes, objects)
+- "Read temperatures from a file"           → FILE I/O + DATA PROCESSING
+- "Check if a password meets requirements"  → CONDITIONALS (if/else logic, boolean expressions)
+- "Create a menu-driven calculator"         → FUNCTIONS + SWITCH/CASE or IF-ELSE CHAINS
+- "Track inventory with add/remove"         → DATA STRUCTURES (lists/arrays, CRUD operations)
 
-BAD competencies (domain-specific — NEVER do this):
-- "Purpose of storing mountain heights"      ← about mountains, not programming
-- "Understanding data organisation"          ← too vague, not technical
-- "Analysing the need for ordering"          ← about the problem, not the skill
-- "Evaluating output clarity"               ← too abstract
+The CRITERIA you generate must test whether the student understands THESE TECHNICAL
+CONCEPTS — not whether they know about balls, mountains, grades, or books.
 
-Questions CAN use the assignment's scenario for context (e.g. "In your mountain
-program, why did you use an array?"), but the COMPETENCY being tested must always
-be a technical programming concept (e.g. "Using arrays to store multiple values").
+═══════════════════════════════════════════════════════════════
+STEP 2: BUILD COMPETENCIES AROUND THE TECHNICAL CONCEPT
+═══════════════════════════════════════════════════════════════
+
+Each competency MUST be framed as understanding of the TECHNICAL CONCEPT.
+Ask yourself: "If I removed the scenario and replaced it with a completely different
+one, would this competency still make sense?" If yes — it's a good competency.
+If no — you're testing the scenario, not the concept.
+
+GOOD competencies (concept-focused — these survive scenario changes):
+- "Understanding why a for-loop is used for a known number of iterations"
+- "Understanding the difference between for-loops and while-loops"
+- "Understanding why arrays are needed to store multiple related values"
+- "Understanding how conditional logic controls program flow"
+- "Understanding parameter passing in functions"
+- "Understanding how nested loops process 2D data"
+
+BAD competencies (scenario-dependent — NEVER generate these):
+- "Purpose of counting red balls"           ← about balls, not loops
+- "Understanding mountain height storage"   ← about mountains, not arrays
+- "Explaining grade calculation"            ← about grades, not arithmetic
+- "Purpose of tracking library books"       ← about books, not OOP
+- "Understanding data organisation"         ← too vague, not a real concept
+- "Reading input from the user"             ← too generic, what concept does it test?
+
+═══════════════════════════════════════════════════════════════
+WHAT MAKES A GOOD CRITERION — THE CONCEPT TEST
+═══════════════════════════════════════════════════════════════
+
+A good criterion checks: "Does the student understand WHY this programming concept
+exists, WHEN to use it, and HOW it works?"
+
+For LOOPS, good criteria probe:
+- Why do we need loops instead of copy-pasting code?
+- When would you use a for-loop vs a while-loop?
+- How does the loop know when to stop?
+- What happens if the loop condition is never false?
+
+For ARRAYS, good criteria probe:
+- Why store values in an array instead of separate variables?
+- How do you access a specific element?
+- What happens if you go past the end of the array?
+
+For CONDITIONALS, good criteria probe:
+- Why do programs need to make decisions?
+- What's the difference between if-else and nested if?
+- How does combining conditions with AND/OR work?
+
+For FUNCTIONS, good criteria probe:
+- Why break code into functions instead of writing everything in main?
+- What's the difference between parameters and return values?
+- Why does a function need a return type?
+
+The questions CAN reference the assignment scenario for familiarity (e.g. "In your
+ball-counting program, why did you use a for-loop?") but the CONCEPT being tested
+must be the for-loop, not the balls.
 
 ═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
@@ -203,76 +243,49 @@ VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
 - Think: "Can a beginner explain this in 15 seconds of speaking?"
 
 ═══════════════════════════════════════════════════════════════
-CONCEPTUAL UNDERSTANDING — NO SYNTAX RECALL
-═══════════════════════════════════════════════════════════════
-
-Competencies must test UNDERSTANDING of programming concepts, NOT recall of:
-- Language keywords (int, float, void, etc.)
-- Syntax rules (semicolons, brackets, etc.)
-- Data type names or function signatures
-- Method names or API details
-- Domain facts (mountain heights, student scores, etc.)
-
-GOOD: competency = "Using arrays to store multiple values"
-      question = "Your program stores 10 heights — why use an array instead of 10 separate variables?"
-BAD:  competency = "Purpose of storing mountain heights"
-      question = "Why do programs need input from users?"
-
-The GOOD question is specific to what the student DID. The BAD question is generic philosophy.
-
-═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY RULES (follow these EXACTLY)
 ═══════════════════════════════════════════════════════════════
 
 Map each criterion to ONE of the following Bloom's levels.
 Use the EXACT difficulty_level integer AND the EXACT level_label string shown below.
 
-┌─────────────────┬────────────────────┬──────────────────────────────────────────────────────────────────┐
-│ difficulty_level │ level_label        │ Permitted action verbs & what to assess                         │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 1               │ "Remember"         │ DEFINE, NAME, RECALL, STATE                                     │
-│                 │                    │ Student recalls a SPECIFIC fact about their program.             │
-│                 │                    │ Example Q: "In your program, where do the 10 numbers go?"        │
-│                 │                    │ Example Q: "How many values does your program read?"             │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE                                    │
-│                 │                    │ Student explains a specific decision in their program.           │
-│                 │                    │ Example Q: "Why store all 10 heights instead of one at a time?"  │
-│                 │                    │ Example Q: "After sorting, why are the largest values at the end?"│
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 3               │ "Apply"            │ DEMONSTRATE (verbally), SOLVE, USE                              │
-│                 │                    │ Student describes how a part of their program works.             │
-│                 │                    │ Example Q: "Walk me through how your program finds the top 3."   │
-│                 │                    │ Example Q: "What would happen if someone entered a negative number?"│
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 4               │ "Analyse"          │ COMPARE, DIFFERENTIATE, EXPLAIN WHY                             │
-│                 │                    │ Student compares approaches or identifies trade-offs.            │
-│                 │                    │ Example Q: "Could you find the top 3 without sorting?"           │
-│                 │                    │ Example Q: "What's different about sorting all 10 vs picking top 3?"│
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, SUGGEST                                     │
-│                 │                    │ Student critiques or proposes improvements.                      │
-│                 │                    │ Example Q: "If the task asked for top 5 instead of 3, what changes?"│
-│                 │                    │ Example Q: "What breaks if two mountains have the same height?"  │
-└─────────────────┴────────────────────┴──────────────────────────────────────────────────────────────────┘
+Level 1 — "Remember":
+  Student recalls a specific fact about the TECHNICAL CONCEPT used in their program.
+  Example: "What type of loop did you use in your program?"
+  Example: "How many parameters does your main function take?"
+
+Level 2 — "Understand":
+  Student explains WHY a specific technical decision was made.
+  Example: "Why did you use a for-loop instead of a while-loop here?"
+  Example: "Why did you need an array instead of a single variable?"
+
+Level 3 — "Apply":
+  Student describes HOW a technical concept works step-by-step.
+  Example: "Walk me through what happens in each iteration of your loop."
+  Example: "What would happen if the loop condition was changed to <=?"
+
+Level 4 — "Analyse":
+  Student compares approaches or identifies trade-offs between technical choices.
+  Example: "Could you solve this with a while-loop instead? What would be different?"
+  Example: "What's the trade-off between using a fixed-size array vs a dynamic one?"
+
+Level 5 — "Evaluate & Create":
+  Student critiques or proposes improvements to their technical approach.
+  Example: "If the number of items wasn't known in advance, how would your approach change?"
+  Example: "What would break if you removed the boundary check in your loop?"
 
 IMPORTANT CONSTRAINTS:
 - {count_instruction}
 - Every criterion's level_description must contain 2-3 example VERBAL QUESTIONS that are SHORT (under 25 words each).
-- The competency MUST be a TECHNICAL PROGRAMMING SKILL — never a domain-specific concept.
-- Questions MAY reference the assignment's scenario for familiarity, but the skill tested must be technical.
-- The marking_criteria must describe what the assessor LISTENS FOR — keep it beginner-appropriate.
-- Each criterion must target a DIFFERENT technical competency from the assignment.
+- The competency MUST name a TECHNICAL PROGRAMMING CONCEPT — never a domain/scenario concept.
+- Questions MAY reference the assignment's scenario for familiarity, but the concept tested must be technical.
+- The marking_criteria must describe what CONCEPTUAL UNDERSTANDING the assessor LISTENS FOR.
+- Each criterion must target a DIFFERENT technical concept from the assignment.
 - Every criterion must be assessable through 1-2 simple spoken sentences from the student.
 
-For each grading criterion provide:
-- competency: the skill or knowledge area being probed (keep it simple and focused)
-- difficulty_level: integer 1-5 as per the table above
-- level_label: EXACT string from the table above
-- level_description: 2-3 example SHORT VERBAL QUESTIONS (under 25 words each) using the correct Bloom's verbs
-- marking_criteria: specific observable indicators the assessor LISTENS FOR in a short spoken answer
-
-NOTE: All questions are scored out of a FIXED 10 points. Do NOT include max_points in criteria.
+From the assignment text you must also extract:
+1. The programming language used (e.g. "Python", "Java", "C++").
+2. A list of learning objectives — these should name TECHNICAL CONCEPTS, not scenario goals.
 
 OUTPUT FORMAT (JSON only, no other text):
 {{{{
@@ -284,12 +297,12 @@ OUTPUT FORMAT (JSON only, no other text):
       "difficulty_level": 2,
       "level_label": "Understand",
       "level_description": "Explain what ... / Describe why ...",
-      "marking_criteria": "Full marks: student clearly explains... Partial: mentions but cannot elaborate... No marks: cannot answer."
+      "marking_criteria": "Full marks: student clearly explains the concept... Partial: mentions but cannot elaborate... No marks: cannot answer."
     }}}}
   ]
 }}}}
 
-Return ONLY valid JSON. Cover ALL key technical competencies from the assignment.""".strip()
+Return ONLY valid JSON. Cover ALL key technical concepts from the assignment.""".strip()
 
     # ------------------------------------------------------------------
     # Parse

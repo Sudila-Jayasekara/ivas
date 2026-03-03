@@ -153,10 +153,12 @@ For warn_and_reask: {{"action": "warn_and_reask", "reason": "brief explanation",
         if code_context:
             code_section = f"\nBACKGROUND (student's code for reference only — do NOT evaluate the code itself):\n{code_context}\n"
 
-        return f"""You are an expert instructor conducting an oral viva to assess a BEGINNER student's CONCEPTUAL UNDERSTANDING.
+        return f"""You are an expert instructor conducting an oral viva to assess a BEGINNER student's CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT.
 
-PURPOSE: Check whether the student truly UNDERSTANDS the concept — not whether they can write code.
-This is NOT a code review. Focus on the IDEA, not syntax.
+PURPOSE: Check whether the student truly UNDERSTANDS the TECHNICAL CONCEPT
+being tested — WHY it exists, WHEN to use it, and HOW it works.
+This is NOT about whether the student can describe their program's behavior.
+Focus on their understanding of the CONCEPT, not the scenario.
 
 SPEECH-TO-TEXT NOTE:
 The student spoke into a microphone and speech was converted to text.
@@ -169,23 +171,26 @@ QUESTION: {question_text}
 EXPECTED CONCEPTUAL ANSWER: {expected_answer}
 STUDENT'S SPOKEN ANSWER: {student_answer}
 {code_section}
-COMPETENCY: {competency}
+TECHNICAL CONCEPT BEING TESTED: {competency}
 DIFFICULTY: {difficulty}/5
 MAX POINTS: {max_points}
 
 ═══════════════════════════════════════════════════════════════
-SCORING RUBRIC (be encouraging and fair to beginners):
+SCORING RUBRIC — BASED ON CONCEPT UNDERSTANDING
 ═══════════════════════════════════════════════════════════════
 
-9-10 (EXCELLENT): Explains the core concept accurately. Clear understanding. Spoken in simple, mostly correct terms.
+Score based on how well the student demonstrates understanding of the
+TECHNICAL CONCEPT — not how well they describe the assignment scenario.
 
-7-8 (GOOD): Core concept is correct, even if explained very simply or briefly. Main idea is right.
+9-10 (EXCELLENT): Demonstrates clear understanding of the concept. Explains WHY/WHEN/HOW correctly using their own words.
 
-5-6 (ADEQUATE): Shows partial understanding. Has the right general idea but might be missing a piece of the puzzle, or lacks some clarity.
+7-8 (GOOD): Core concept understanding is correct. May be brief or simply stated, but the technical idea is right.
 
-3-4 (WEAK): Vague understanding. Touches on the topic but struggles to articulate the point.
+5-6 (ADEQUATE): Partial concept understanding. Has the right general idea but missing key aspects of WHY or HOW the concept works.
 
-1-2 (INCORRECT): Answer is factually wrong, contradicts the expected answer entirely.
+3-4 (WEAK): Vague understanding. Mentions the concept but cannot explain WHY it's used or HOW it works.
+
+1-2 (INCORRECT): Answer shows fundamental misunderstanding of the concept. Confuses concepts or states something technically wrong.
 
 0 (NO CREDIT): Non-answers, abuse, or zero conceptual content.
 
@@ -193,13 +198,14 @@ SCORING RUBRIC (be encouraging and fair to beginners):
 MANDATORY SCORING RULES:
 ═══════════════════════════════════════════════════════════════
 
-1. COMPARE against the EXPECTED ANSWER. If the student captures the SPIRIT of the answer, reward them generously (7-10).
-2. Do NOT penalize for short answers. This is a verbal test. If they say the correct concept in 5 words, that is still a 9-10.
-3. BE LENIENT with terminology. If they say "keyboard" instead of "standard input", that is totally fine, do not dock points.
-4. If the student's answer is partially right, give them 5-6 points and use "follow_up" to guide them to the rest.
-5. VAGUE answers ("it's easy", "it's good") without WHY/HOW get lower scores, but if they attempt to explain, grant points for the attempt.
-6. DIFFICULTY SCALING: At difficulty 4-5, expect a bit more reasoning, but still be generous to beginners.
+1. COMPARE against the EXPECTED ANSWER. If the student captures the CONCEPT described in the expected answer, reward them generously (7-10).
+2. If the student describes what their program does WITHOUT explaining the concept, score 3-5 max — they're describing behavior, not demonstrating understanding.
+3. Do NOT penalize for short answers. If they explain the concept correctly in 5 words, that is still 9-10.
+4. BE LENIENT with terminology. If they say "keyboard" instead of "standard input", that is totally fine.
+5. If the student's answer is partially right conceptually, give 5-6 and use "follow_up" to guide them.
+6. VAGUE answers ("it's easy", "it makes things work") without WHY/HOW get 1-3.
 7. Do NOT penalize for inability to recite code syntax.
+8. CONCEPT vs SCENARIO: A student who says "I used a for-loop because I knew there were exactly 10 items" scores higher than one who says "My program reads mountain heights" — even though the second is more 'specific' to the assignment.
 
 ═══════════════════════════════════════════════════════════════
 FEEDBACK RULES:
@@ -539,23 +545,24 @@ Return ONLY the teaching text, nothing else.""".strip()
         if conversation_history:
             history_block = f"\n{conversation_history}\n"
 
-        prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING. The student gave a partially correct answer. Ask ONE follow-up question to guide deeper understanding.
+        prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT. The student gave a partially correct answer. Ask ONE follow-up question to guide deeper understanding of the CONCEPT.
 
 ORIGINAL QUESTION: {question_text}
 STUDENT'S ANSWER: {student_answer}
 EVALUATION FEEDBACK: {feedback}
 {misconception_section}{code_section}{history_block}
-COMPETENCY: {competency}
+TECHNICAL CONCEPT BEING TESTED: {competency}
 
 RULES:
 1. Ask exactly ONE concise follow-up question (1-2 sentences).
-2. Probe CONCEPTUAL understanding — ask WHY, WHEN, or HOW.
-3. Do NOT ask them to write or recite code.
-4. Do NOT reveal the answer — guide their thinking.
-5. Keep it conversational and encouraging.
-6. Do NOT use forced analogies (NO apples, fruits, baskets, cookies). Stay in the assignment domain.
-7. If a misconception was detected, design the question to challenge that specific misconception.
-8. If conversation history shows previous follow-ups, ask about a DIFFERENT aspect.
+2. Probe deeper into the TECHNICAL CONCEPT — ask WHY, WHEN, or HOW the concept works.
+3. Do NOT ask about the assignment scenario (balls, mountains, etc.) — ask about the CONCEPT (loops, arrays, etc.).
+4. Do NOT ask them to write or recite code.
+5. Do NOT reveal the answer — guide their thinking toward the concept.
+6. Keep it conversational and encouraging.
+7. Do NOT use forced analogies (NO apples, fruits, baskets, cookies).
+8. If a misconception was detected, design the question to challenge that specific misconception about the CONCEPT.
+9. If conversation history shows previous follow-ups, ask about a DIFFERENT aspect of the concept.
 
 Return ONLY the follow-up question text, nothing else.""".strip()
 
