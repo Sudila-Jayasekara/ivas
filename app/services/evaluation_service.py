@@ -31,9 +31,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class InputGuardResult:
-    action: str      # "evaluate" | "teach_and_skip" | "warn_and_reask"
+    action: str      # "evaluate" | "teach_and_skip" | "explain_and_reask" | "clarify_relevance" | "warn_and_reask"
     reason: str      # Brief LLM explanation
-    warning: str = ""  # LLM-generated warning (only for warn_and_reask)
+    warning: str = ""           # LLM-generated warning (only for warn_and_reask)
+    explanation: str = ""       # LLM-generated explanation (for explain_and_reask / clarify_relevance)
 
 
 @dataclass
@@ -71,32 +72,56 @@ class EvaluationService:
         if conversation_history:
             history_block = f"\n{conversation_history}\n"
 
-        return f"""You are an instructor deciding what to do next in an oral assessment.
+        return f"""You are a REAL human instructor conducting an oral viva exam. You care about your student and want to help them learn while fairly assessing their understanding.
 
 SPEECH-TO-TEXT NOTE: The student spoke into a microphone. There WILL be transcription errors — interpret garbled words by sound/context (e.g. "arrival" might mean "array will", "struck" might mean "struct"). Focus on MEANING and INTENT.
 
-QUESTION: {question_text}
+QUESTION ASKED: {question_text}
 
 STUDENT SAID: "{student_answer}"
 {history_block}
-Decide the NEXT ACTION:
+Decide the NEXT ACTION based on what the student actually MEANT:
 
-- "evaluate": The student is attempting to answer — even if wrong, vague, partial, or poorly worded. Any effort to address the topic should be evaluated.
+1. "evaluate": The student is genuinely ATTEMPTING to answer the question with conceptual content — even if wrong, vague, partial, or poorly worded. There must be REAL topical content to score.
 
-- "teach_and_skip": The student provided NO conceptual content to evaluate. They may be unsure, confused, explicitly don't know, want to skip, gave an empty acknowledgement, or simply have nothing to say about this topic. There is nothing meaningful to score — teach them the concept and move on.
+2. "teach_and_skip": The student has NO conceptual content to evaluate. This includes:
+   - Explicitly doesn't know ("I don't know", "no idea")
+   - Wants to skip ("can we skip?", "next question")
+   - Deflections with zero technical content ("because I'm lazy", "I just do")
+   - Bare affirmations with NO reasoning ("yes", "I think so", "maybe")
+   - Empty acknowledgements ("ok", "sure", "right")
+   ⚠️ CRITICAL: A deflection like "because I'm lazy" is NOT an attempt to answer. Do NOT evaluate it — the student is avoiding the question, not demonstrating a misconception.
 
-- "warn_and_reask": The student is being abusive, offensive, or deliberately disruptive. Generate a firm but professional warning.
+3. "explain_and_reask": The student is asking YOU for help understanding the question. They want to try but need guidance first. This includes:
+   - Asking for clarification ("can you explain?", "what do you mean?", "I don't understand the question")
+   - Asking to redo ("can I try again?", "let me redo this", "explain it more")
+   - Asking for a hint ("can you give me a hint?")
+   - Expressing confusion about what's being asked ("what you mean beyond that loop")
+   ⚠️ CRITICAL: If a student asks to redo or for more explanation, ALWAYS honor it. Never ignore a student's request for help.
 
-GUIDANCE:
-- If the student says ANYTHING related to the topic (even incorrect), choose "evaluate"
-- If there is no conceptual content at all, choose "teach_and_skip" — never force a student to re-answer when they have nothing to offer
+4. "clarify_relevance": The student is questioning WHY this topic is being asked — they don't see the connection to their assignment. This includes:
+   - "Why are you asking about loops? This is an arrays assignment"
+   - "What does this have to do with my code?"
+   - "This isn't relevant"
+   ⚠️ This is actually CRITICAL THINKING — the student deserves an explanation of why the topic matters.
+
+5. "warn_and_reask": The student is being abusive, offensive, or deliberately disruptive. Generate a firm but professional warning.
+
+GUIDANCE FOR A REAL INSTRUCTOR:
+- If the student says ANYTHING with real topical content (even incorrect), choose "evaluate"
+- If there is no conceptual content at all (deflections, bare "yes/no", acknowledgements), choose "teach_and_skip"
+- If the student is asking for YOUR help to understand the question, choose "explain_and_reask" — a real instructor would NEVER ignore a student asking for help
+- If the student questions why a topic matters, choose "clarify_relevance" — explain the connection
 - Only choose "warn_and_reask" for genuinely abusive or offensive content
 - Speech-to-text may garble words — be generous in interpretation
-- If the conversation history shows the student has been struggling or confused, prefer "teach_and_skip" over forcing more attempts
 
 Return ONLY valid JSON:
 For evaluate/teach_and_skip: {{"action": "<action>", "reason": "brief explanation"}}
-For warn_and_reask: {{"action": "warn_and_reask", "reason": "brief explanation", "warning": "Your firm but professional warning to the student"}}""".strip()
+For explain_and_reask: {{"action": "explain_and_reask", "reason": "brief explanation", "explanation": "Your kind, simple re-explanation of what the question is asking, in 1-2 sentences"}}
+For clarify_relevance: {{"action": "clarify_relevance", "reason": "brief explanation", "explanation": "Your brief explanation of WHY this topic is relevant to their assignment, in 1-2 sentences"}}
+For warn_and_reask: {{"action": "warn_and_reask", "reason": "brief explanation", "warning": "Your firm but professional warning"}}""".strip()
+
+    VALID_GUARD_ACTIONS = ("evaluate", "teach_and_skip", "explain_and_reask", "clarify_relevance", "warn_and_reask")
 
     @staticmethod
     def _parse_guard_response(raw: str) -> InputGuardResult:
@@ -108,11 +133,12 @@ For warn_and_reask: {{"action": "warn_and_reask", "reason": "brief explanation",
                 return InputGuardResult(action="evaluate", reason="parse_fallback")
             data = json.loads(text[start:end])
             action = str(data.get("action", "evaluate")).lower().strip()
-            if action not in ("evaluate", "teach_and_skip", "warn_and_reask"):
+            if action not in EvaluationService.VALID_GUARD_ACTIONS:
                 action = "evaluate"
             reason = str(data.get("reason", ""))
             warning = str(data.get("warning", ""))
-            return InputGuardResult(action=action, reason=reason, warning=warning)
+            explanation = str(data.get("explanation", ""))
+            return InputGuardResult(action=action, reason=reason, warning=warning, explanation=explanation)
         except (json.JSONDecodeError, ValueError, TypeError):
             return InputGuardResult(action="evaluate", reason="parse_fallback")
 
@@ -153,7 +179,7 @@ For warn_and_reask: {{"action": "warn_and_reask", "reason": "brief explanation",
         if code_context:
             code_section = f"\nBACKGROUND (student's code for reference only — do NOT evaluate the code itself):\n{code_context}\n"
 
-        return f"""You are an expert instructor conducting an oral viva to assess a BEGINNER student's CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT.
+        return f"""You are a REAL human instructor conducting an oral viva to assess a BEGINNER student's CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT.
 
 PURPOSE: Check whether the student truly UNDERSTANDS the TECHNICAL CONCEPT
 being tested — WHY it exists, WHEN to use it, and HOW it works.
@@ -206,9 +232,11 @@ MANDATORY SCORING RULES:
 6. VAGUE answers ("it's easy", "it makes things work") without WHY/HOW get 1-3.
 7. Do NOT penalize for inability to recite code syntax.
 8. CONCEPT vs SCENARIO: A student who says "I used a for-loop because I knew there were exactly 10 items" scores higher than one who says "My program reads mountain heights" — even though the second is more 'specific' to the assignment.
+9. VALID BUT SUBOPTIMAL: If the student proposes an approach that WORKS correctly but isn't the most efficient (e.g. sorting the whole array to find top 3), score 5-6 minimum — they understand the concept, just not the optimal approach. Only score 3-4 if the approach shows real conceptual gaps.
+10. BEGINNER LENIENCY: For difficulty {difficulty}/5, remember this student is a BEGINNER. At higher difficulties, don't expect expert-level answers — if they show they're on the right track conceptually, be generous.
 
 ═══════════════════════════════════════════════════════════════
-FEEDBACK RULES:
+FEEDBACK RULES — SOUND LIKE A REAL PERSON:
 ═══════════════════════════════════════════════════════════════
 
 1. Be HONEST and SPECIFIC. If wrong, say so clearly but kindly.
@@ -217,6 +245,15 @@ FEEDBACK RULES:
 4. For PARTIALLY CORRECT: Acknowledge what's right, state what's missing.
 5. For GOOD: Confirm understanding and suggest how to deepen it.
 6. Keep to 1-3 sentences.
+7. ⚠️ VARY YOUR LANGUAGE! Do NOT use the same opening phrase repeatedly. NEVER start with "That's a good start!" — use natural, varied responses like a real human would. Examples of good variety:
+   - "You're on the right track — ..."
+   - "Exactly right! ..."
+   - "Close! The key thing you're missing is..."
+   - "I see what you mean, but..."
+   - "Nice thinking! To take it further..."
+   - "Not quite — here's the thing..."
+   - "You've got the basic idea. Now..."
+   Each response should feel like a unique, natural reaction from a real instructor.
 
 ═══════════════════════════════════════════════════════════════
 MISCONCEPTION DETECTION (be thorough):
@@ -479,21 +516,21 @@ Return ONLY valid JSON.""".strip()
         if conversation_history:
             history_block = f"\n{conversation_history}\n"
 
-        prompt = f"""You are a kind tutor during an oral viva. The student said they don't know the answer. Your job is to BRIEFLY TEACH the concept so they learn from this moment, then we move on to the next question.
+        prompt = f"""You are a kind, real human tutor during an oral viva. The student can't answer this question. Briefly teach the concept so they learn, then we move on.
 
 QUESTION THAT WAS ASKED: {question_text}
 EXPECTED ANSWER: {expected_answer}
 COMPETENCY: {competency}
 {history_block}
 RULES:
-1. Start with something warm like "No worries!" or "That's okay!" — never shame them.
-2. Explain the core concept in 2-3 simple sentences, suitable for a beginner.
-3. Use the expected answer as your guide but rephrase it in plain, conversational language.
-4. Do NOT just dump the expected answer verbatim — teach it naturally.
-5. End with a brief encouraging note like "Let's move on to the next question."
-6. Keep it SHORT — max 4 sentences total.
-7. Do NOT ask any questions — this is a teaching moment, not a quiz.
-8. If conversation history shows previous explanations, build on them — don't repeat the same explanation.
+1. Start warmly ("No worries!", "That's okay!", "Don't stress!") — never shame them. VARY your opening — don't always use the same phrase.
+2. Give a CONCEPTUAL NUDGE in 1-2 simple sentences — help them understand the KEY IDEA without dumping the full technical answer.
+3. Do NOT give away the complete answer or advanced details. Focus on the ONE core idea they need.
+4. End with encouragement like "Let's move on to the next question."
+5. Keep it SHORT — max 3 sentences total.
+6. Do NOT ask any questions — this is a teaching moment, not a quiz.
+7. If conversation history shows previous explanations, build on them — don't repeat.
+8. Sound like a real person, not a textbook. Use simple everyday language.
 
 Return ONLY the teaching text, nothing else.""".strip()
 
@@ -523,11 +560,19 @@ Return ONLY the teaching text, nothing else.""".strip()
         student_answer: str,
         feedback: str,
         competency: str,
+        score: float = 5.0,
+        max_score: int = 10,
+        difficulty: int = 1,
         misconceptions: list[str] | None = None,
         code_context: str = "",
         conversation_history: str = "",
     ) -> str | None:
         """Generate a single Socratic follow-up question via LLM.
+
+        The follow-up scaffolds based on the student's score:
+        - Low scores (0-4): simpler, more basic follow-up
+        - Medium scores (5-6): targets the specific gap
+        - High scores (7-8): can probe slightly deeper
 
         Returns the follow-up question text, or None on failure.
         """
@@ -545,24 +590,32 @@ Return ONLY the teaching text, nothing else.""".strip()
         if conversation_history:
             history_block = f"\n{conversation_history}\n"
 
-        prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT. The student gave a partially correct answer. Ask ONE follow-up question to guide deeper understanding of the CONCEPT.
+        prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT. The student gave an answer and you need to ask ONE follow-up question.
 
 ORIGINAL QUESTION: {question_text}
 STUDENT'S ANSWER: {student_answer}
+STUDENT'S SCORE: {score}/{max_score} (on the original question)
 EVALUATION FEEDBACK: {feedback}
 {misconception_section}{code_section}{history_block}
 TECHNICAL CONCEPT BEING TESTED: {competency}
+DIFFICULTY LEVEL: {difficulty}/5
 
-RULES:
+SCAFFOLDING RULES — MATCH THE STUDENT'S LEVEL:
+- If score was LOW (0-4): The student is STRUGGLING. Ask a SIMPLER, more basic question that breaks the concept into a smaller piece. Do NOT escalate complexity. Ask about the most fundamental aspect they should know.
+- If score was MEDIUM (5-6): The student has partial understanding. Ask about the specific gap — the ONE thing they're missing.
+- If score was HIGH (7-8): The student understands the basics. NOW you can probe slightly deeper — ask WHY or WHEN.
+
+⚠️ CRITICAL: NEVER ask a follow-up that is MORE COMPLEX than the original question. If a student scored 2/10, asking about algorithm internals or optimization is UNFAIR. Ask something simpler.
+
+GENERAL RULES:
 1. Ask exactly ONE concise follow-up question (1-2 sentences).
-2. Probe deeper into the TECHNICAL CONCEPT — ask WHY, WHEN, or HOW the concept works.
-3. Do NOT ask about the assignment scenario (balls, mountains, etc.) — ask about the CONCEPT (loops, arrays, etc.).
-4. Do NOT ask them to write or recite code.
-5. Do NOT reveal the answer — guide their thinking toward the concept.
-6. Keep it conversational and encouraging.
-7. Do NOT use forced analogies (NO apples, fruits, baskets, cookies).
-8. If a misconception was detected, design the question to challenge that specific misconception about the CONCEPT.
-9. If conversation history shows previous follow-ups, ask about a DIFFERENT aspect of the concept.
+2. Focus on the TECHNICAL CONCEPT — not the assignment scenario.
+3. Do NOT ask them to write or recite code.
+4. Do NOT reveal the answer — guide their thinking.
+5. Keep it conversational and encouraging, like a real person.
+6. Do NOT use forced analogies (NO apples, fruits, baskets, cookies).
+7. If a misconception was detected, gently challenge it.
+8. If conversation history shows previous follow-ups, ask about a DIFFERENT aspect.
 
 Return ONLY the follow-up question text, nothing else.""".strip()
 
@@ -580,6 +633,107 @@ Return ONLY the follow-up question text, nothing else.""".strip()
         except Exception as e:
             logger.error("Follow-up generation failed: %s", e, exc_info=True)
             return None
+
+    # ==================================================================
+    # Relevance explanation (for clarify_relevance action)
+    # ==================================================================
+
+    def generate_relevance_explanation(
+        self,
+        question_text: str,
+        competency: str,
+        assignment_context: str = "",
+    ) -> str:
+        """Explain WHY a topic/competency is relevant to the student's assignment.
+
+        Used when the student questions why they're being asked about a topic.
+        Returns explanation text.
+        """
+        context_block = ""
+        if assignment_context:
+            context_block = f"\nASSIGNMENT CONTEXT: {assignment_context}\n"
+
+        prompt = f"""You are a kind instructor during an oral viva. The student just asked why you're asking about this topic — they don't see the connection to their assignment.
+
+QUESTION BEING ASKED: {question_text}
+TECHNICAL CONCEPT: {competency}
+{context_block}
+Your job: Briefly explain WHY this concept matters for their work. Be encouraging and make the connection clear.
+
+RULES:
+1. Keep it to 1-2 sentences.
+2. Be specific — explain the actual connection (e.g. "Loops are how you process every element in your array — without them, you'd have to handle each item manually!")
+3. Sound like a real person, not a textbook.
+4. End with something encouraging that leads back to the question.
+5. Do NOT lecture or be condescending.
+
+Return ONLY the explanation text, nothing else.""".strip()
+
+        try:
+            raw = llm_service.generate(
+                prompt=prompt,
+                temperature=0.4,
+                max_output_tokens=200,
+                num_predict=200,
+            )
+            text = raw.strip().strip('"').strip("'")
+            if text:
+                return text
+        except Exception as e:
+            logger.error("Relevance explanation failed: %s", e)
+
+        return f"Great question! {competency} is closely related to how your code works. Let me ask the question again."
+
+    # ==================================================================
+    # Question re-explanation (for explain_and_reask action)
+    # ==================================================================
+
+    def generate_question_explanation(
+        self,
+        question_text: str,
+        expected_answer: str,
+        competency: str,
+        conversation_history: str = "",
+    ) -> str:
+        """Re-explain a question more simply when the student asks for clarification.
+
+        Returns the explanation text.
+        """
+        history_block = ""
+        if conversation_history:
+            history_block = f"\n{conversation_history}\n"
+
+        prompt = f"""You are a kind instructor during an oral viva. The student is asking you to explain or clarify the question. They WANT to try answering but need help understanding what you're asking.
+
+ORIGINAL QUESTION: {question_text}
+TECHNICAL CONCEPT: {competency}
+{history_block}
+Your job: Re-explain the question in SIMPLER words so the student can understand and attempt an answer.
+
+RULES:
+1. Start with something warm like "Sure!" or "Of course!" — show you're happy to help.
+2. Rephrase the question in simpler, more concrete language (1-2 sentences).
+3. You can give a small hint about what KIND of answer you're looking for, but do NOT reveal the answer itself.
+4. End by encouraging them to try: "Give it your best shot!" or similar.
+5. Keep it SHORT — max 3 sentences.
+6. Sound like a real person having a conversation.
+
+Return ONLY the explanation text, nothing else.""".strip()
+
+        try:
+            raw = llm_service.generate(
+                prompt=prompt,
+                temperature=0.4,
+                max_output_tokens=250,
+                num_predict=250,
+            )
+            text = raw.strip().strip('"').strip("'")
+            if text:
+                return text
+        except Exception as e:
+            logger.error("Question explanation failed: %s", e)
+
+        return "Sure! Let me put it differently. Think about the core concept and give it your best shot!"
 
 
 # Singleton

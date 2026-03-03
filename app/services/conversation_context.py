@@ -110,6 +110,13 @@ async def build_conversation_context(
             elif classification == "warn_and_reask":
                 if resp.feedback_text:
                     lines.append(f"[Instructor warned]: \"{resp.feedback_text}\"")
+            elif classification == "explain_and_reask":
+                clarification_count += 1
+                if resp.feedback_text:
+                    lines.append(f"[Instructor re-explained the question]: \"{resp.feedback_text}\"")
+            elif classification == "clarify_relevance":
+                if resp.feedback_text:
+                    lines.append(f"[Instructor explained why this topic matters]: \"{resp.feedback_text}\"")
             elif resp.evaluation_score is not None:
                 lines.append(
                     f"[System scored]: {resp.evaluation_score}/10"
