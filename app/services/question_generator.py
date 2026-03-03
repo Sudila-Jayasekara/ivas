@@ -48,8 +48,23 @@ class QuestionGenerator:
         programming_language: str,
         learning_objectives: list[str],
         assignment_text: str = "",
+        num_questions: int | None = None,
     ) -> str:
         objectives = ", ".join(learning_objectives)
+
+        # Dynamic question count
+        if num_questions is not None:
+            count_instruction = f"Generate EXACTLY {num_questions} different viva voce questions"
+            output_count_note = f"JSON array with exactly {num_questions} items"
+            overlap_rule = f"The {num_questions} questions must test genuinely DIFFERENT aspects — if two questions would get the same answer, they are too similar."
+        else:
+            count_instruction = """Generate 1 to 3 viva voce questions (decide based on the competency's breadth:
+- Narrow competency with one clear concept: 1 question
+- Moderate competency with 2 aspects: 2 questions
+- Broad competency covering multiple facets: 3 questions)
+You MUST cover ALL important aspects of this competency. Do not skip any"""
+            output_count_note = "JSON array with 1-3 items"
+            overlap_rule = "Each question must test a genuinely DIFFERENT aspect — if two questions would get the same answer, they are too similar."
 
         assignment_section = ""
         if assignment_text:
@@ -74,14 +89,13 @@ ASSIGNMENT:
 \"\"\"
 """
 
-        return f"""You are an expert instructor creating SIMPLE oral viva questions for BEGINNER students.
+        return f"""You are an expert instructor creating oral viva questions for BEGINNER students.
 
-PURPOSE: This viva checks whether the student truly UNDERSTANDS the concepts — not whether
-they can write code. We want to know: Do they understand WHY something works? Can they
-relate it to real-world problems? Can they explain the concept in their own words?
+PURPOSE: These questions check whether the student UNDERSTANDS what they did in their
+assignment and WHY their code works. Questions must be SPECIFIC to the assignment — 
+not generic programming philosophy.
 
-Generate exactly 2 different viva voce questions for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
-The 2 questions must test DIFFERENT aspects of this competency. Do NOT repeat the same question with different wording.
+{count_instruction} for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
 {assignment_section}
 CONTEXT:
 - Programming Language: {programming_language}
@@ -92,23 +106,34 @@ CONTEXT:
 - Learning Objectives: {objectives}
 
 ═══════════════════════════════════════════════════════════════
-CONCEPTUAL UNDERSTANDING — THIS IS WHAT WE'RE CHECKING
+QUESTION QUALITY — SPECIFIC, NOT VAGUE
 ═══════════════════════════════════════════════════════════════
 
-Questions MUST focus on TECHNICAL PROGRAMMING UNDERSTANDING:
-- Ask WHY a programming concept exists or matters
-- Ask HOW a technical concept applies to solving problems
-- Ask students to EXPLAIN a programming decision in their own words
-- Ask for COMPARISONS between programming approaches (at higher levels)
-- Ask WHEN you would use one technical approach over another
+Questions MUST be SPECIFIC to the assignment. They should reference what the
+student ACTUALLY DID — the data they worked with, the steps their program takes,
+the output it produces. NEVER ask generic "why does this concept exist?" questions.
+
+GOOD questions (specific, grounded in the assignment):
+- "Your program reads 10 numbers — where do those numbers go after reading them?"
+- "After sorting the heights, how does your program pick just the top 3?"
+- "What would happen if two mountains had the same height in your program?"
+- "If you added an 11th mountain, what would you need to change?"
+
+BAD questions (vague, philosophical — NEVER generate these):
+- "Why do programs need to get information from the user?" ← too obvious, no depth
+- "What is the main purpose of reading input?" ← generic, not specific to assignment
+- "Imagine you're building a program. Why might you need a number?" ← philosophical
+- "Why would you use an array?" ← generic, not grounded in what they did
+
+The difference: GOOD questions make the student think about THEIR specific program.
+BAD questions sound like textbook definitions anyone could answer without doing the assignment.
 
 Do NOT:
-- Ask about the domain/scenario itself (mountains, heights, scores, etc.)
 - Ask students to write, recite, or describe code syntax
 - Ask "what is the output of this code?"
 - Ask about syntax details (semicolons, brackets, etc.)
-- Test memorisation of function names, data type names, or language-specific syntax
-- Ask students to NAME or RECALL specific keywords (e.g. "What data type stores...?")
+- Test memorisation of function names or data type names
+- Ask generic "why does X exist in programming?" questions
 
 ═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — THIS IS A SPOKEN ASSESSMENT
@@ -121,8 +146,6 @@ their voice to text. This means:
 - Answers MUST be expressible in 1-3 SHORT spoken sentences
 - Do NOT ask multi-part questions (no "and also" or "additionally")
 - Do NOT require precise technical jargon that speech-to-text may garble
-- AVOID questions needing lists of more than 3 items
-- PREFER questions answerable with a conceptual explanation
 - Think: "Can a beginner answer this in 15 seconds of speaking?"
 - Expected answers should use everyday language a beginner would naturally speak
 
@@ -134,31 +157,30 @@ The question MUST match the Bloom's level "{level_label}" (difficulty {difficult
 Follow these rules STRICTLY:
 
 Level 1 — "Remember":
-  → Ask the student to RECALL or explain the PURPOSE of a programming concept.
-  → Keep it to ONE simple thing to recall.
-  → Example: "What does an array let you do in a program?"
-  → Example: "What is the purpose of reading input from the user?"
+  → Ask the student to recall a SPECIFIC fact about their program.
+  → Reference something concrete from the assignment.
+  → Example: "In your program, where do the 10 numbers go after you read them?"
+  → Example: "How many numbers does your program read from the user?"
 
 Level 2 — "Understand":
-  → Ask the student to EXPLAIN or DESCRIBE ONE programming concept in their own words.
-  → Example: "Why would you use an array instead of separate variables in your program?"
-  → Example: "In your own words, why is sorting useful when you need specific values?"
+  → Ask the student to EXPLAIN a specific decision in their program.
+  → Example: "Why did your program need to store all 10 heights instead of just reading one at a time?"
+  → Example: "After sorting, why are the top 3 heights at the end of the array?"
 
 Level 3 — "Apply":
-  → Ask how they'd apply a technical concept to solve a problem.
-  → MAY reference the assignment scenario for context.
-  → Example: "How would you find the largest value stored in an array?"
-  → Example: "What would you do if the user entered invalid input in your program?"
+  → Ask how a specific part of their program works step by step.
+  → Example: "Walk me through how your program finds the 3 largest heights."
+  → Example: "What would your program do if the user entered a negative number?"
 
 Level 4 — "Analyse":
-  → Ask ONE comparison, trade-off, or "why would you choose" question about techniques.
-  → Example: "What's the difference between sorting all values and just finding the largest?"
-  → Example: "Why might you choose a loop over writing each comparison separately?"
+  → Ask to compare approaches or identify trade-offs in their solution.
+  → Example: "Could you find the top 3 heights without sorting? What would be different?"
+  → Example: "What's the difference between sorting all 10 and just picking the 3 biggest?"
 
 Level 5 — "Evaluate & Create":
-  → Ask the student to make a judgment, critique, or propose a technical approach.
-  → Example: "How would you change your program if you needed to handle more values?"
-  → Example: "What would go wrong if your program never checked for invalid input?"
+  → Ask the student to critique or propose improvements to their program.
+  → Example: "If the assignment asked for the top 5 instead of top 3, what would you change?"
+  → Example: "What would break in your program if two mountains had the same height?"
 
 CRITICAL RULES:
 1. The question MUST be about "{competency}" specifically.
@@ -170,16 +192,14 @@ CRITICAL RULES:
 7. All questions are scored out of 10 points — do NOT include max_points in output.
 8. Questions MUST test the TECHNICAL COMPETENCY — NOT domain knowledge. The question should test programming skills, not facts about mountains/students/etc.
 9. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.).
-10. The 2 questions must test genuinely DIFFERENT aspects — if both questions would get the same answer, they are too similar.
+10. {overlap_rule}
+11. LOGICAL COHERENCE: The question MUST logically relate to the actual code the student wrote and make total sense. Do NOT generate "stupid" or nonsensical questions.
+12. STRICT EXPECTED ANSWER MATCH: The expected answer MUST completely and accurately answer the question. Later upon evaluation, the model will strictly compare the student's spoken response against this expected answer.
 
-OUTPUT FORMAT (JSON array with exactly 2 items, no other text):
+OUTPUT FORMAT ({output_count_note}, no other text):
 [
   {{
     "question_text": "Your short question here (under 30 words)",
-    "expected_answer": "Brief expected response (under 60 words)..."
-  }},
-  {{
-    "question_text": "A different short question (under 30 words)",
     "expected_answer": "Brief expected response (under 60 words)..."
   }}
 ]
@@ -241,6 +261,7 @@ Return ONLY valid JSON array.""".strip()
         *,
         criteria_rows: list[dict],
         assignment_text: str = "",
+        num_questions: int | None = None,
     ) -> list[GeneratedQuestionAI]:
         """
         Parameters
@@ -251,9 +272,10 @@ Return ONLY valid JSON array.""".strip()
             learning_objectives.  Optionally: criteria_id.
         assignment_text : str
             The original assignment text, used to keep questions in context.
+        num_questions : int | None
+            Optional: exact number of questions per criterion. If None, LLM decides.
 
-        Generates exactly two questions per criteria row (one per competency).
-        With 5 Bloom's levels × 2 questions each = 10 questions total.
+        Generates questions for each criteria row. Count is dynamic.
         """
         all_questions: list[GeneratedQuestionAI] = []
 
@@ -262,8 +284,8 @@ Return ONLY valid JSON array.""".strip()
             difficulty = cr["difficulty_level"]
             criteria_id = cr.get("criteria_id")
             logger.info(
-                "Generating 2 questions for competency=%s difficulty=%d",
-                competency, difficulty,
+                "Generating questions for competency=%s difficulty=%d (num_questions=%s)",
+                competency, difficulty, num_questions,
             )
 
             prompt = self._build_prompt(
@@ -275,6 +297,7 @@ Return ONLY valid JSON array.""".strip()
                 programming_language=cr["programming_language"],
                 learning_objectives=cr["learning_objectives"],
                 assignment_text=assignment_text,
+                num_questions=num_questions,
             )
 
             try:
