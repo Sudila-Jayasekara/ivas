@@ -132,6 +132,24 @@ async def _run_schema_migrations() -> None:
                 ))
                 logger.info("Migration: added %s to assessment_question_instances", col)
 
+        # Migration: Add LLM layer output columns to student_responses
+        for col, col_def in [
+            ("input_classification", "VARCHAR"),
+            ("score_justification", "TEXT"),
+            ("deep_analysis", "JSONB"),
+            ("voice_intent", "VARCHAR"),
+        ]:
+            chk = await conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'student_responses' "
+                f"AND column_name = '{col}'"
+            ))
+            if not chk.fetchone():
+                await conn.execute(text(
+                    f"ALTER TABLE student_responses ADD COLUMN {col} {col_def}"
+                ))
+                logger.info("Migration: added %s to student_responses", col)
+
 
 async def close_db() -> None:
     global engine

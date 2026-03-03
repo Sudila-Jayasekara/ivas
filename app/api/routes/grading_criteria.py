@@ -34,7 +34,7 @@ async def generate_grading_criteria(
     svc: GradingCriteriaService = Depends(get_grading_criteria_service),
 ):
     try:
-        result = await svc.generate(assignment_id, req.assignment_text, req.replace_existing)
+        result = await svc.generate(assignment_id, req.assignment_text, req.replace_existing, num_criteria=req.num_criteria)
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=502, detail=str(e))
 

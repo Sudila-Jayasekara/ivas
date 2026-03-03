@@ -29,10 +29,12 @@ router = APIRouter(tags=["questions"])
 async def generate_questions(
     assignment_id: str,
     criteria_id: Optional[str] = Query(None, description="Generate questions for a specific grading criterion only"),
+    assignment_text: Optional[str] = Query(None, description="Original assignment text for context-aware question generation"),
+    num_questions: Optional[int] = Query(None, ge=1, le=5, description="Optional: exact number of questions per criterion. If omitted, AI decides."),
     svc: QuestionService = Depends(get_question_service),
 ):
     try:
-        result = await svc.generate_questions(assignment_id, criteria_id=criteria_id)
+        result = await svc.generate_questions(assignment_id, criteria_id=criteria_id, assignment_text=assignment_text or "", num_questions=num_questions)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

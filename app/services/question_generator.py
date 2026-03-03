@@ -47,13 +47,50 @@ class QuestionGenerator:
         marking_criteria: str,
         programming_language: str,
         learning_objectives: list[str],
+        assignment_text: str = "",
+        num_questions: int | None = None,
     ) -> str:
         objectives = ", ".join(learning_objectives)
 
-        return f"""You are an expert programming instructor creating oral viva questions.
+        # Dynamic question count
+        if num_questions is not None:
+            count_instruction = f"Generate EXACTLY {num_questions} different viva voce questions"
+            output_count_note = f"JSON array with exactly {num_questions} items"
+            overlap_rule = f"The {num_questions} questions must test genuinely DIFFERENT aspects — if two questions would get the same answer, they are too similar."
+        else:
+            count_instruction = """Generate 1 to 3 viva voce questions (decide based on the competency's breadth:
+- Narrow competency with one clear concept: 1 question
+- Moderate competency with 2 aspects: 2 questions
+- Broad competency covering multiple facets: 3 questions)
+You MUST cover ALL important aspects of this competency. Do not skip any"""
+            output_count_note = "JSON array with 1-3 items"
+            overlap_rule = "Each question must test a genuinely DIFFERENT aspect — if two questions would get the same answer, they are too similar."
 
-Generate exactly 1 viva voce question for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
+        assignment_section = ""
+        if assignment_text:
+            assignment_section = f"""
+═══════════════════════════════════════════════════════════════
+ASSIGNMENT CONTEXT — FOR LIGHT REFERENCE ONLY
+═══════════════════════════════════════════════════════════════
 
+The student completed this assignment. You MAY lightly reference the scenario
+to make questions feel familiar, but the question MUST primarily test the
+TECHNICAL CONCEPT "{competency}" — NOT the assignment's domain/scenario.
+
+ASSIGNMENT:
+\"\"\"
+{assignment_text}
+\"\"\"
+"""
+
+        return f"""You are an expert instructor creating oral viva questions for BEGINNER students.
+
+PURPOSE: These questions check whether the student UNDERSTANDS the technical
+CONCEPT behind what they did — WHY it works, WHEN to use it, and HOW it
+behaves. You are NOT checking if they can describe what their program does.
+
+{count_instruction} for the competency "{competency}" at difficulty level {difficulty_level} ({level_label}).
+{assignment_section}
 CONTEXT:
 - Programming Language: {programming_language}
 - Competency: {competency}
@@ -63,6 +100,72 @@ CONTEXT:
 - Learning Objectives: {objectives}
 
 ═══════════════════════════════════════════════════════════════
+THE GOLDEN RULE — TEST THE CONCEPT, NOT THE SCENARIO
+═══════════════════════════════════════════════════════════════
+
+Every assignment uses a SCENARIO (balls, mountains, students, etc.) to teach
+a TECHNICAL CONCEPT (loops, arrays, conditionals, etc.). Your questions MUST
+test whether the student understands the CONCEPT — not the scenario.
+
+Ask yourself: "Would this question still make sense if the scenario changed
+but the same programming concept was used?" If YES → good question.
+If NO → you're testing the scenario, rewrite it.
+
+GOOD questions (test the CONCEPT — survive scenario changes):
+- "Why did you use a for-loop here instead of a while-loop?"
+  → Tests: understanding of loop types (works regardless of scenario)
+- "What would happen if your loop condition was never true?"
+  → Tests: understanding of loop mechanics
+- "Why did you need an array instead of a single variable?"
+  → Tests: understanding of when arrays are needed
+- "What's the difference between passing by value and by reference?"
+  → Tests: understanding of parameter passing
+
+BAD questions (test the SCENARIO — break if scenario changes):
+- "Why do we need to count the red balls?"
+  → Tests: the scenario, not the loop concept
+- "What does your program output when given 10 mountain heights?"
+  → Tests: specific program behavior, not understanding
+- "Why is it important to track student grades?"
+  → Tests: domain knowledge, not programming skill
+- "What is the main purpose of reading input?"
+  → Too generic, doesn't test any specific concept
+
+The difference: GOOD questions have a definitive technical answer about
+the programming concept. BAD questions are about the scenario or so generic
+that anyone could answer without understanding the concept.
+
+═══════════════════════════════════════════════════════════════
+EXPECTED ANSWERS — MUST DEMONSTRATE CONCEPTUAL UNDERSTANDING
+═══════════════════════════════════════════════════════════════
+
+The expected_answer MUST be a conceptual explanation of the TECHNICAL CONCEPT.
+It should show understanding of WHY/WHEN/HOW the concept works — not describe
+what the student's specific program does.
+
+GOOD expected answer (for "Why a for-loop instead of while-loop?"):
+"A for-loop is better when you know exactly how many times to repeat. Since
+we know there are 10 items, a for-loop handles the counting automatically."
+
+BAD expected answer:
+"The program reads 10 mountain heights and stores them in an array."
+(This describes WHAT the program does, not WHY the concept was used.)
+
+═══════════════════════════════════════════════════════════════
+VOICE-FIRST DESIGN — THIS IS A SPOKEN ASSESSMENT
+═══════════════════════════════════════════════════════════════
+
+Students answer by SPEAKING into a microphone. Speech-to-text converts
+their voice to text. This means:
+- Questions MUST be SHORT (1-2 sentences max, under 30 words)
+- Questions MUST be simple and direct — one clear thing to answer
+- Answers MUST be expressible in 1-3 SHORT spoken sentences
+- Do NOT ask multi-part questions (no "and also" or "additionally")
+- Do NOT require precise technical jargon that speech-to-text may garble
+- Think: "Can a beginner answer this in 15 seconds of speaking?"
+- Expected answers should use everyday language a beginner would naturally speak
+
+═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY QUESTION DESIGN RULES
 ═══════════════════════════════════════════════════════════════
 
@@ -70,52 +173,49 @@ The question MUST match the Bloom's level "{level_label}" (difficulty {difficult
 Follow these rules STRICTLY:
 
 Level 1 — "Remember":
-  → Ask the student to RECALL, DEFINE, LIST, NAME, or STATE facts/terms.
-  → Questions should test memorisation of syntax, definitions, or terminology.
-  → Do NOT ask "why" or "how" — only "what".
-  → Example: "What is the syntax for declaring a struct in C++?"
+  → Ask the student to recall a fact about the TECHNICAL CONCEPT they used.
+  → Example: "What type of loop did you use in your program?"
+  → Example: "What data structure did you use to store the values?"
 
 Level 2 — "Understand":
-  → Ask the student to EXPLAIN, DESCRIBE, SUMMARISE, COMPARE, or CONTRAST concepts.
-  → The student must demonstrate comprehension IN THEIR OWN WORDS.
-  → Do NOT present a new scenario to solve — that is Apply level.
-  → Do NOT ask them to walk through steps — that is Apply level.
-  → Example: "Explain why using functions improves code readability."
+  → Ask the student to EXPLAIN WHY they chose a specific technical approach.
+  → Example: "Why did you use a for-loop instead of a while-loop?"
+  → Example: "Why does your program need an array instead of separate variables?"
 
 Level 3 — "Apply":
-  → Present a SPECIFIC CONCRETE SCENARIO and ask the student to walk through
-    how they would SOLVE, USE, IMPLEMENT, or CALCULATE using their knowledge.
-  → The question MUST contain a scenario (e.g., "Given X...", "Imagine you have...").
-  → The student must demonstrate they can USE their knowledge in a new situation.
-  → Example: "Given a rectangle with length 5.5 and width 3.2, walk me through
-    how your function would calculate and display the perimeter."
+  → Ask how the technical concept works step by step.
+  → Example: "What happens in your loop when it reaches the last iteration?"
+  → Example: "What would happen if you changed the loop to start from 1 instead of 0?"
 
 Level 4 — "Analyse":
-  → Ask the student to ANALYSE, COMPARE alternatives, find TRADE-OFFS, or
-    DIFFERENTIATE between approaches with reasoning.
-  → The question MUST ask WHY one approach is better/worse or what the
-    TRADE-OFFS are between alternatives.
-  → Example: "Compare using pass-by-reference vs pass-by-value for this function.
-    What are the trade-offs in terms of memory and side effects?"
+  → Ask to compare technical approaches or identify concept trade-offs.
+  → Example: "Could you solve this with a while-loop instead? What would change?"
+  → Example: "What's the trade-off between sorting first vs finding the max directly?"
 
 Level 5 — "Evaluate & Create":
-  → Ask the student to EVALUATE, JUSTIFY, CRITIQUE, DESIGN, or PROPOSE solutions.
-  → The question MUST require critical thinking, judgment, or designing a new approach.
-  → Example: "Critique your error handling approach. What weaknesses does it have,
-    and how would you redesign it for a production system?"
+  → Ask the student to critique or extend their technical approach.
+  → Example: "If you didn't know how many items there would be, how would your approach change?"
+  → Example: "What would break in your logic if the input was empty?"
 
 CRITICAL RULES:
-1. The question MUST be about "{competency}" specifically.
+1. The question MUST be about "{competency}" specifically — the TECHNICAL CONCEPT.
 2. The question MUST use the action verbs for "{level_label}" level ONLY.
-3. The question must be answerable verbally (no code writing or diagrams).
-4. The expected_answer must describe what a strong student would say at this Bloom's level.
-5. All questions are scored out of 10 points — do NOT include max_points in output.
+3. Maximum 30 words in the question — SHORT and DIRECT.
+4. The expected_answer must demonstrate CONCEPTUAL UNDERSTANDING (not describe program behavior) in 1-3 spoken sentences (under 60 words).
+5. Do NOT ask multi-part questions. ONE question, ONE thing to answer.
+6. Do NOT require code syntax in the answer. Accept conceptual explanations.
+7. All questions are scored out of 10 points — do NOT include max_points in output.
+8. Questions MUST test the TECHNICAL CONCEPT — NOT domain/scenario knowledge.
+9. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.).
+10. {overlap_rule}
+11. LOGICAL COHERENCE: The question must make sense in the context of the concept being tested.
+12. STRICT EXPECTED ANSWER MATCH: The expected answer must be a correct conceptual explanation that directly answers the question.
 
-OUTPUT FORMAT (JSON array with exactly 1 item, no other text):
+OUTPUT FORMAT ({output_count_note}, no other text):
 [
   {{
-    "question_text": "Your question here",
-    "expected_answer": "Expected student response covering key points..."
+    "question_text": "Your short question here (under 30 words)",
+    "expected_answer": "Brief conceptual explanation (under 60 words)..."
   }}
 ]
 
@@ -175,6 +275,8 @@ Return ONLY valid JSON array.""".strip()
         self,
         *,
         criteria_rows: list[dict],
+        assignment_text: str = "",
+        num_questions: int | None = None,
     ) -> list[GeneratedQuestionAI]:
         """
         Parameters
@@ -182,9 +284,13 @@ Return ONLY valid JSON array.""".strip()
         criteria_rows : list[dict]
             Each dict must contain: competency, difficulty_level, level_label,
             level_description, marking_criteria, programming_language,
-            learning_objectives, max_points.  Optionally: criteria_id.
+            learning_objectives.  Optionally: criteria_id.
+        assignment_text : str
+            The original assignment text, used to keep questions in context.
+        num_questions : int | None
+            Optional: exact number of questions per criterion. If None, LLM decides.
 
-        Generates exactly one question per criteria row (one per competency).
+        Generates questions for each criteria row. Count is dynamic.
         """
         all_questions: list[GeneratedQuestionAI] = []
 
@@ -193,8 +299,8 @@ Return ONLY valid JSON array.""".strip()
             difficulty = cr["difficulty_level"]
             criteria_id = cr.get("criteria_id")
             logger.info(
-                "Generating 1 question for competency=%s difficulty=%d",
-                competency, difficulty,
+                "Generating questions for competency=%s difficulty=%d (num_questions=%s)",
+                competency, difficulty, num_questions,
             )
 
             prompt = self._build_prompt(
@@ -205,15 +311,17 @@ Return ONLY valid JSON array.""".strip()
                 marking_criteria=cr["marking_criteria"],
                 programming_language=cr["programming_language"],
                 learning_objectives=cr["learning_objectives"],
+                assignment_text=assignment_text,
+                num_questions=num_questions,
             )
 
             try:
                 response_text = llm_service.generate(
                     prompt=prompt,
-                    temperature=0.8,
-                    num_predict=2500,
-                    max_output_tokens=2500,
-                    top_p=0.9,
+                    temperature=0.5,
+                    num_predict=1500,
+                    max_output_tokens=1500,
+                    top_p=0.85,
                 )
 
                 questions = self._parse_response(response_text, competency, difficulty)

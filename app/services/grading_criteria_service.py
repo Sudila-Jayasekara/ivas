@@ -31,11 +31,11 @@ class GradingCriteriaService:
     # Generate (API 1)
     # ------------------------------------------------------------------
 
-    async def generate(self, assignment_id: str, assignment_text: str, replace_existing: bool = False) -> dict:
+    async def generate(self, assignment_id: str, assignment_text: str, replace_existing: bool = False, *, num_criteria: int | None = None) -> dict:
         """Send assignment text to AI, parse response, persist criteria rows."""
-        logger.info("Generating grading criteria for assignment=%s (replace=%s)", assignment_id, replace_existing)
+        logger.info("Generating grading criteria for assignment=%s (replace=%s, num_criteria=%s)", assignment_id, replace_existing, num_criteria)
 
-        prompt = self._build_prompt(assignment_text)
+        prompt = self._build_prompt(assignment_text, num_criteria=num_criteria)
 
         try:
             response_text = await asyncio.to_thread(
@@ -127,105 +127,182 @@ class GradingCriteriaService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_prompt(assignment_text: str) -> str:
-        return f"""You are an expert university lecturer designing an ORAL VIVA assessment. Analyse the following assignment text and produce grading criteria that can ONLY be assessed through spoken conversation — no written answers, no live coding.
+    def _build_prompt(assignment_text: str, *, num_criteria: int | None = None) -> str:
+        # Build the criteria count instruction dynamically
+        if num_criteria is not None:
+            count_instruction = f"""Generate EXACTLY {num_criteria} criteria. You MUST produce exactly {num_criteria} — no more, no less.
+Each criterion must target a DIFFERENT technical competency from the assignment.
+Map each criterion to a different Bloom's level (use levels 1-5 as needed; if {num_criteria} < 5, pick the most relevant levels; if {num_criteria} > 5, you may reuse levels for different competencies)."""
+        else:
+            count_instruction = """Decide HOW MANY criteria to generate based on the assignment's complexity and the number of distinct technical competencies it covers.
+- Simple assignments (1-2 concepts): generate 3 criteria
+- Medium assignments (3-4 concepts): generate 4-5 criteria
+- Complex assignments (5+ concepts): generate 5-6 criteria
+You MUST cover ALL key technical competencies in the assignment — do not leave any out.
+Map each criterion to a Bloom's level (1-5). Use as many different levels as appropriate."""
+
+        return f"""You are an expert university lecturer designing an ORAL VIVA assessment for BEGINNER students.
+The students will answer questions by SPEAKING into a microphone (speech-to-text).
 
 ASSIGNMENT TEXT:
 \"\"\"
 {assignment_text}
 \"\"\"
 
-From the assignment text above you must extract:
-1. The programming language used (e.g. "Python", "Java", "C++").
-2. A list of learning objectives the assignment addresses.
-3. A set of oral-viva grading criteria covering different competencies and Bloom's taxonomy levels.
+═══════════════════════════════════════════════════════════════
+STEP 1 (MOST IMPORTANT): IDENTIFY THE CORE TECHNICAL TOPIC(S)
+═══════════════════════════════════════════════════════════════
 
-Each criterion must be designed so that an assessor can probe student understanding purely through verbal questions and conversation. Do NOT produce criteria that require the student to write code, run programs, or submit text. Everything must be testable by asking the student to EXPLAIN, JUSTIFY, DESCRIBE, or DISCUSS verbally.
+Before generating ANY criteria, you MUST first identify WHAT TECHNICAL CONCEPT(S)
+this assignment is designed to teach. Every assignment uses a SCENARIO (e.g. counting
+balls, managing students, sorting mountains) as a VEHICLE to teach one or more
+PROGRAMMING CONCEPTS.
+
+Your job is to SEE THROUGH the scenario and identify the REAL topic:
+
+SCENARIO → REAL TECHNICAL TOPIC (examples):
+- "Count red and blue balls in a bag"       → LOOPS (iteration, counting patterns)
+- "Store and sort mountain heights"         → ARRAYS + SORTING ALGORITHMS
+- "Calculate student grade averages"        → LOOPS + ARITHMETIC OPERATIONS
+- "Build a library book tracker"            → OBJECT-ORIENTED PROGRAMMING (classes, objects)
+- "Read temperatures from a file"           → FILE I/O + DATA PROCESSING
+- "Check if a password meets requirements"  → CONDITIONALS (if/else logic, boolean expressions)
+- "Create a menu-driven calculator"         → FUNCTIONS + SWITCH/CASE or IF-ELSE CHAINS
+- "Track inventory with add/remove"         → DATA STRUCTURES (lists/arrays, CRUD operations)
+
+The CRITERIA you generate must test whether the student understands THESE TECHNICAL
+CONCEPTS — not whether they know about balls, mountains, grades, or books.
+
+═══════════════════════════════════════════════════════════════
+STEP 2: BUILD COMPETENCIES AROUND THE TECHNICAL CONCEPT
+═══════════════════════════════════════════════════════════════
+
+Each competency MUST be framed as understanding of the TECHNICAL CONCEPT.
+Ask yourself: "If I removed the scenario and replaced it with a completely different
+one, would this competency still make sense?" If yes — it's a good competency.
+If no — you're testing the scenario, not the concept.
+
+GOOD competencies (concept-focused — these survive scenario changes):
+- "Understanding why a for-loop is used for a known number of iterations"
+- "Understanding the difference between for-loops and while-loops"
+- "Understanding why arrays are needed to store multiple related values"
+- "Understanding how conditional logic controls program flow"
+- "Understanding parameter passing in functions"
+- "Understanding how nested loops process 2D data"
+
+BAD competencies (scenario-dependent — NEVER generate these):
+- "Purpose of counting red balls"           ← about balls, not loops
+- "Understanding mountain height storage"   ← about mountains, not arrays
+- "Explaining grade calculation"            ← about grades, not arithmetic
+- "Purpose of tracking library books"       ← about books, not OOP
+- "Understanding data organisation"         ← too vague, not a real concept
+- "Reading input from the user"             ← too generic, what concept does it test?
+
+═══════════════════════════════════════════════════════════════
+WHAT MAKES A GOOD CRITERION — THE CONCEPT TEST
+═══════════════════════════════════════════════════════════════
+
+A good criterion checks: "Does the student understand WHY this programming concept
+exists, WHEN to use it, and HOW it works?"
+
+For LOOPS, good criteria probe:
+- Why do we need loops instead of copy-pasting code?
+- When would you use a for-loop vs a while-loop?
+- How does the loop know when to stop?
+- What happens if the loop condition is never false?
+
+For ARRAYS, good criteria probe:
+- Why store values in an array instead of separate variables?
+- How do you access a specific element?
+- What happens if you go past the end of the array?
+
+For CONDITIONALS, good criteria probe:
+- Why do programs need to make decisions?
+- What's the difference between if-else and nested if?
+- How does combining conditions with AND/OR work?
+
+For FUNCTIONS, good criteria probe:
+- Why break code into functions instead of writing everything in main?
+- What's the difference between parameters and return values?
+- Why does a function need a return type?
+
+The questions CAN reference the assignment scenario for familiarity (e.g. "In your
+ball-counting program, why did you use a for-loop?") but the CONCEPT being tested
+must be the for-loop, not the balls.
+
+═══════════════════════════════════════════════════════════════
+VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
+═══════════════════════════════════════════════════════════════
+
+- Students answer by SPEAKING (speech-to-text may garble technical terms)
+- Every question derived from these criteria must be answerable in 1-3 SHORT sentences
+- Do NOT create criteria that require students to recite exact code syntax
+- Do NOT create criteria requiring long multi-step explanations
+- PREFER criteria that test conceptual understanding over syntax knowledge
+- Each criterion should lead to ONE focused question, not multi-part questions
+- Think: "Can a beginner explain this in 15 seconds of speaking?"
 
 ═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY RULES (follow these EXACTLY)
 ═══════════════════════════════════════════════════════════════
 
-You MUST map each criterion to ONE of the following Bloom's levels.
+Map each criterion to ONE of the following Bloom's levels.
 Use the EXACT difficulty_level integer AND the EXACT level_label string shown below.
-Use ONLY the action verbs listed for that level — both in level_description and marking_criteria.
 
-┌─────────────────┬────────────────────┬──────────────────────────────────────────────────────────────────┐
-│ difficulty_level │ level_label        │ Permitted action verbs & what to assess                         │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 1               │ "Remember"         │ DEFINE, LIST, RECALL, NAME, IDENTIFY, STATE                     │
-│                 │                    │ Student recalls facts, terms, definitions from memory.           │
-│                 │                    │ Example Q: "Can you list the data types in C++?"                 │
-│                 │                    │ Example Q: "What is the syntax for declaring a function?"        │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE, PARAPHRASE, COMPARE, CONTRAST     │
-│                 │                    │ Student demonstrates comprehension by explaining concepts        │
-│                 │                    │ IN THEIR OWN WORDS. No application to new scenarios.             │
-│                 │                    │ Example Q: "Explain why functions are useful in programming."     │
-│                 │                    │ Example Q: "Describe the difference between pass-by-value and    │
-│                 │                    │  pass-by-reference."                                             │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 3               │ "Apply"            │ DEMONSTRATE, SOLVE, USE, IMPLEMENT (verbally), CALCULATE        │
-│                 │                    │ Student applies knowledge to a SPECIFIC NEW SCENARIO verbally.   │
-│                 │                    │ The question MUST present a concrete scenario and ask the        │
-│                 │                    │ student to walk through their approach step-by-step.             │
-│                 │                    │ Example Q: "Given a radius of 5, walk me through how your        │
-│                 │                    │  function calculates the area."                                  │
-│                 │                    │ Example Q: "If the user enters -3 as input, what would happen    │
-│                 │                    │  in your program and how would you handle it?"                   │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 4               │ "Analyse"          │ ANALYSE, DIFFERENTIATE, COMPARE, CONTRAST, EXAMINE, DECONSTRUCT │
-│                 │                    │ Student breaks down a problem into parts, identifies             │
-│                 │                    │ relationships, or compares alternatives with reasoning.          │
-│                 │                    │ The question MUST ask WHY or HOW alternatives differ.            │
-│                 │                    │ Example Q: "Why did you use pass-by-reference here instead of    │
-│                 │                    │  pass-by-value? What would change if you switched?"              │
-│                 │                    │ Example Q: "Compare using a single monolithic function vs.       │
-│                 │                    │  decomposing into multiple functions. What are the trade-offs?"  │
-├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
-│ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, CRITIQUE, DESIGN, PROPOSE, HYPOTHESISE      │
-│                 │                    │ Student makes judgements, defends design decisions, or           │
-│                 │                    │ proposes new solutions to complex/novel situations.              │
-│                 │                    │ The question MUST require critical thinking and justification.   │
-│                 │                    │ Example Q: "If you had to redesign this program to handle 1000   │
-│                 │                    │  shapes, what would you change and why?"                         │
-│                 │                    │ Example Q: "Critique your error handling strategy. What are its  │
-│                 │                    │  weaknesses and how would you improve it?"                       │
-└─────────────────┴────────────────────┴──────────────────────────────────────────────────────────────────┘
+Level 1 — "Remember":
+  Student recalls a specific fact about the TECHNICAL CONCEPT used in their program.
+  Example: "What type of loop did you use in your program?"
+  Example: "How many parameters does your main function take?"
+
+Level 2 — "Understand":
+  Student explains WHY a specific technical decision was made.
+  Example: "Why did you use a for-loop instead of a while-loop here?"
+  Example: "Why did you need an array instead of a single variable?"
+
+Level 3 — "Apply":
+  Student describes HOW a technical concept works step-by-step.
+  Example: "Walk me through what happens in each iteration of your loop."
+  Example: "What would happen if the loop condition was changed to <=?"
+
+Level 4 — "Analyse":
+  Student compares approaches or identifies trade-offs between technical choices.
+  Example: "Could you solve this with a while-loop instead? What would be different?"
+  Example: "What's the trade-off between using a fixed-size array vs a dynamic one?"
+
+Level 5 — "Evaluate & Create":
+  Student critiques or proposes improvements to their technical approach.
+  Example: "If the number of items wasn't known in advance, how would your approach change?"
+  Example: "What would break if you removed the boundary check in your loop?"
 
 IMPORTANT CONSTRAINTS:
-- Every criterion's level_description must contain 2-4 example VERBAL QUESTIONS using ONLY the action verbs for that level.
-- Do NOT use "Describe" or "Explain" verbs in Apply/Analyse/Evaluate levels — those belong to Understand.
-- Do NOT use "Walk me through" or scenario-based questions at the Understand level — those belong to Apply.
-- The marking_criteria must describe what assessors LISTEN FOR at the specific Bloom's level, not generic pass/fail.
-- Generate a good spread across difficulty levels (aim for at least 2-3 different levels).
-- Every criterion must be assessable purely through verbal dialogue.
+- {count_instruction}
+- Every criterion's level_description must contain 2-3 example VERBAL QUESTIONS that are SHORT (under 25 words each).
+- The competency MUST name a TECHNICAL PROGRAMMING CONCEPT — never a domain/scenario concept.
+- Questions MAY reference the assignment's scenario for familiarity, but the concept tested must be technical.
+- The marking_criteria must describe what CONCEPTUAL UNDERSTANDING the assessor LISTENS FOR.
+- Each criterion must target a DIFFERENT technical concept from the assignment.
+- Every criterion must be assessable through 1-2 simple spoken sentences from the student.
 
-For each grading criterion provide:
-- competency: the skill or knowledge area being probed
-- difficulty_level: integer 1-5 as per the table above
-- level_label: EXACT string from the table above
-- level_description: 2-4 example VERBAL QUESTIONS using the correct Bloom's verbs
-- marking_criteria: specific observable indicators the assessor LISTENS FOR
-
-NOTE: All questions are scored out of a FIXED 10 points. Do NOT include max_points in criteria.
+From the assignment text you must also extract:
+1. The programming language used (e.g. "Python", "Java", "C++").
+2. A list of learning objectives — these should name TECHNICAL CONCEPTS, not scenario goals.
 
 OUTPUT FORMAT (JSON only, no other text):
-{{
+{{{{
   "programming_language": "C++",
   "learning_objectives": ["objective 1", "objective 2"],
   "criteria": [
-    {{
+    {{{{
       "competency": "...",
       "difficulty_level": 2,
       "level_label": "Understand",
-      "level_description": "Explain why ... / Describe how ... / Summarise ...",
-      "marking_criteria": "Full marks: student clearly explains... Partial: student mentions but cannot elaborate... No marks: student cannot answer."
-    }}
+      "level_description": "Explain what ... / Describe why ...",
+      "marking_criteria": "Full marks: student clearly explains the concept... Partial: mentions but cannot elaborate... No marks: cannot answer."
+    }}}}
   ]
-}}
+}}}}
 
-Return ONLY valid JSON. Generate a comprehensive set of criteria covering all key competencies and multiple Bloom's levels relevant to the assignment.""".strip()
+Return ONLY valid JSON. Cover ALL key technical concepts from the assignment.""".strip()
 
     # ------------------------------------------------------------------
     # Parse
@@ -276,6 +353,23 @@ Return ONLY valid JSON. Generate a comprehensive set of criteria covering all ke
 
             if not criteria:
                 return None
+
+            # Enforce exactly one criterion per Bloom's level (5 total).
+            # If LLM generated duplicates for a level, keep only the first.
+            seen_levels: set[int] = set()
+            deduped: list[GradingCriteriaAI] = []
+            for c in criteria:
+                if c.difficulty_level not in seen_levels:
+                    seen_levels.add(c.difficulty_level)
+                    deduped.append(c)
+            criteria = deduped
+
+            if len(criteria) != 5:
+                logger.warning(
+                    "Expected 5 criteria (one per Bloom's level), got %d (levels: %s)",
+                    len(criteria),
+                    sorted(seen_levels),
+                )
 
             return {
                 "programming_language": programming_language,

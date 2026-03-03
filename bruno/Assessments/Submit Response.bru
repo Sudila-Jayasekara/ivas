@@ -21,11 +21,21 @@ headers {
 body:json {
   {
     "question_instance_id": "{{question_instance_id}}",
-    "response_text": "purpose of structure to store data as structre",
+    "response_text": "A struct is used to group related data together, like storing a student's name and age in one place",
     "response_type": "text"
   }
 }
 
+script:post-response {
+  const data = res.getBody();
+  
+  if (data.next_question && data.next_question.question_instance_id) {
+    bru.setVar("question_instance_id", data.next_question.question_instance_id);
+  }
+}
+
 docs {
-  Submit a student response to a question in the assessment session
+  Submit a student response to a question in the assessment session.
+  response_text should be a conceptual explanation (as if spoken in a viva).
+  response_type: "text" for typed answers, "audio" for voice transcriptions.
 }
