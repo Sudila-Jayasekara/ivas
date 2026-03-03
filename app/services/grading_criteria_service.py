@@ -31,11 +31,11 @@ class GradingCriteriaService:
     # Generate (API 1)
     # ------------------------------------------------------------------
 
-    async def generate(self, assignment_id: str, assignment_text: str, replace_existing: bool = False) -> dict:
+    async def generate(self, assignment_id: str, assignment_text: str, replace_existing: bool = False, *, num_criteria: int | None = None) -> dict:
         """Send assignment text to AI, parse response, persist criteria rows."""
-        logger.info("Generating grading criteria for assignment=%s (replace=%s)", assignment_id, replace_existing)
+        logger.info("Generating grading criteria for assignment=%s (replace=%s, num_criteria=%s)", assignment_id, replace_existing, num_criteria)
 
-        prompt = self._build_prompt(assignment_text)
+        prompt = self._build_prompt(assignment_text, num_criteria=num_criteria)
 
         try:
             response_text = await asyncio.to_thread(
@@ -127,7 +127,20 @@ class GradingCriteriaService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_prompt(assignment_text: str) -> str:
+    def _build_prompt(assignment_text: str, *, num_criteria: int | None = None) -> str:
+        # Build the criteria count instruction dynamically
+        if num_criteria is not None:
+            count_instruction = f"""Generate EXACTLY {num_criteria} criteria. You MUST produce exactly {num_criteria} — no more, no less.
+Each criterion must target a DIFFERENT technical competency from the assignment.
+Map each criterion to a different Bloom's level (use levels 1-5 as needed; if {num_criteria} < 5, pick the most relevant levels; if {num_criteria} > 5, you may reuse levels for different competencies)."""
+        else:
+            count_instruction = """Decide HOW MANY criteria to generate based on the assignment's complexity and the number of distinct technical competencies it covers.
+- Simple assignments (1-2 concepts): generate 3 criteria
+- Medium assignments (3-4 concepts): generate 4-5 criteria
+- Complex assignments (5+ concepts): generate 5-6 criteria
+You MUST cover ALL key technical competencies in the assignment — do not leave any out.
+Map each criterion to a Bloom's level (1-5). Use as many different levels as appropriate."""
+
         return f"""You are an expert university lecturer designing an ORAL VIVA assessment for BEGINNER students.
 The students will answer questions by SPEAKING into a microphone (speech-to-text).
 
@@ -201,9 +214,11 @@ Competencies must test UNDERSTANDING of programming concepts, NOT recall of:
 - Domain facts (mountain heights, student scores, etc.)
 
 GOOD: competency = "Using arrays to store multiple values"
-      question = "Why did you use an array in your program instead of separate variables?"
+      question = "Your program stores 10 heights — why use an array instead of 10 separate variables?"
 BAD:  competency = "Purpose of storing mountain heights"
-      question = "Why do we need to save the heights of mountains?"
+      question = "Why do programs need input from users?"
+
+The GOOD question is specific to what the student DID. The BAD question is generic philosophy.
 
 ═══════════════════════════════════════════════════════════════
 BLOOM'S TAXONOMY — MANDATORY RULES (follow these EXACTLY)
@@ -216,33 +231,33 @@ Use the EXACT difficulty_level integer AND the EXACT level_label string shown be
 │ difficulty_level │ level_label        │ Permitted action verbs & what to assess                         │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 1               │ "Remember"         │ DEFINE, NAME, RECALL, STATE                                     │
-│                 │                    │ Student recalls the PURPOSE of a programming concept.            │
-│                 │                    │ Example Q: "What does an array let you do in a program?"         │
-│                 │                    │ Example Q: "What is the purpose of reading input from the user?" │
+│                 │                    │ Student recalls a SPECIFIC fact about their program.             │
+│                 │                    │ Example Q: "In your program, where do the 10 numbers go?"        │
+│                 │                    │ Example Q: "How many values does your program read?"             │
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 2               │ "Understand"       │ EXPLAIN, DESCRIBE, SUMMARISE                                    │
-│                 │                    │ Student explains ONE programming concept in their own words.     │
-│                 │                    │ Example Q: "Why would you use an array instead of separate variables?" │
-│                 │                    │ Example Q: "In your own words, why is sorting useful?"           │
+│                 │                    │ Student explains a specific decision in their program.           │
+│                 │                    │ Example Q: "Why store all 10 heights instead of one at a time?"  │
+│                 │                    │ Example Q: "After sorting, why are the largest values at the end?"│
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 3               │ "Apply"            │ DEMONSTRATE (verbally), SOLVE, USE                              │
-│                 │                    │ Student describes how they'd apply a concept in a scenario.      │
-│                 │                    │ Example Q: "How would you find the largest value in an array?"   │
-│                 │                    │ Example Q: "What would you do if the user entered invalid input?"│
+│                 │                    │ Student describes how a part of their program works.             │
+│                 │                    │ Example Q: "Walk me through how your program finds the top 3."   │
+│                 │                    │ Example Q: "What would happen if someone entered a negative number?"│
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 4               │ "Analyse"          │ COMPARE, DIFFERENTIATE, EXPLAIN WHY                             │
-│                 │                    │ Student identifies ONE difference or trade-off between approaches│
-│                 │                    │ Example Q: "What's the difference between sorting and just finding the max?" │
-│                 │                    │ Example Q: "Why might you choose a loop over writing each step separately?" │
+│                 │                    │ Student compares approaches or identifies trade-offs.            │
+│                 │                    │ Example Q: "Could you find the top 3 without sorting?"           │
+│                 │                    │ Example Q: "What's different about sorting all 10 vs picking top 3?"│
 ├─────────────────┼────────────────────┼──────────────────────────────────────────────────────────────────┤
 │ 5               │ "Evaluate & Create"│ EVALUATE, JUSTIFY, SUGGEST                                     │
-│                 │                    │ Student makes ONE judgment or improvement suggestion.            │
-│                 │                    │ Example Q: "How would you change your program if you needed more values?" │
-│                 │                    │ Example Q: "What would you improve about how your program handles errors?" │
+│                 │                    │ Student critiques or proposes improvements.                      │
+│                 │                    │ Example Q: "If the task asked for top 5 instead of 3, what changes?"│
+│                 │                    │ Example Q: "What breaks if two mountains have the same height?"  │
 └─────────────────┴────────────────────┴──────────────────────────────────────────────────────────────────┘
 
 IMPORTANT CONSTRAINTS:
-- Generate EXACTLY 5 criteria — one for EACH Bloom's level (1 through 5). No more, no less.
+- {count_instruction}
 - Every criterion's level_description must contain 2-3 example VERBAL QUESTIONS that are SHORT (under 25 words each).
 - The competency MUST be a TECHNICAL PROGRAMMING SKILL — never a domain-specific concept.
 - Questions MAY reference the assignment's scenario for familiarity, but the skill tested must be technical.
@@ -274,7 +289,7 @@ OUTPUT FORMAT (JSON only, no other text):
   ]
 }}}}
 
-Return ONLY valid JSON. Generate EXACTLY 5 criteria — one per Bloom's level — covering key competencies from the assignment.""".strip()
+Return ONLY valid JSON. Cover ALL key technical competencies from the assignment.""".strip()
 
     # ------------------------------------------------------------------
     # Parse
