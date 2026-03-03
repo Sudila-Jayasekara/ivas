@@ -164,10 +164,10 @@ SCENARIO → REAL TECHNICAL TOPIC (examples):
 - "A scenario involving repetitive actions"      → TECHNICAL CONTROL STRUCTURES (iteration, patterns)
 - "A scenario involving collections of data"    → DATA STRUCTURES (storage, organization)
 - "A scenario involving calculations"           → ARITHMETIC OR LOGICAL OPERATIONS
-- "A scenario involving complex entities"       → STRUCTURAL DESIGN (classes, objects)
+- "A scenario involving complex entities"       → STRUCTURAL DESIGN (organizing related data and behavior)
 - "A scenario involving external data"          → I/O OPERATIONS (data processing)
 - "A scenario involving decision making"        → CONDITIONAL LOGIC (branching, boolean expressions)
-- "A scenario involving modular tasks"          → MODULAR DESIGN (functions, abstraction)
+- "A scenario involving modular tasks"          → MODULAR DESIGN (decomposition, reusability)
 - "A scenario involving resource management"    → DATA MANAGEMENT (CRUD operations)
 
 The CRITERIA you generate must test whether the student understands THESE TECHNICAL
@@ -284,12 +284,12 @@ IMPORTANT CONSTRAINTS:
 - Every criterion must be assessable through 1-2 simple spoken sentences from the student.
 
 From the assignment text you must also extract:
-1. The programming language used (e.g. "Python", "Java", "C++").
+1. The programming language used (identify it from the assignment text).
 2. A list of learning objectives — these should name TECHNICAL CONCEPTS, not scenario goals.
 
 OUTPUT FORMAT (JSON only, no other text):
 {{{{
-  "programming_language": "C++",
+  "programming_language": "<detected language>",
   "learning_objectives": ["objective 1", "objective 2"],
   "criteria": [
     {{{{

@@ -812,6 +812,8 @@ class AssessmentService:
                 misconceptions=eval_result.misconceptions,
                 code_context=session_obj.code_context or "",
                 conversation_history=conversation_history,
+                expected_answer=question_obj.expected_answer or "",
+                justification=eval_result.justification,
             )
 
             if follow_up_text:

@@ -74,7 +74,7 @@ class EvaluationService:
 
         return f"""You are a REAL human instructor conducting an oral viva exam. You care about your student and want to help them learn while fairly assessing their understanding.
 
-SPEECH-TO-TEXT NOTE: The student spoke into a microphone. There WILL be transcription errors — interpret garbled words by sound/context (e.g. "arrival" might mean "array will", "struck" might mean "struct"). Focus on MEANING and INTENT.
+SPEECH-TO-TEXT NOTE: The student spoke into a microphone. There WILL be transcription errors — interpret garbled words by sound/context. Focus on MEANING and INTENT.
 
 QUESTION ASKED: {question_text}
 
@@ -190,7 +190,7 @@ SPEECH-TO-TEXT NOTE:
 The student spoke into a microphone and speech was converted to text.
 - There WILL be transcription errors and garbled words
 - Focus on MEANING and INTENT, not exact wording
-- Technical terms may be misspelled (e.g. "struck" for "struct")
+- Technical terms may be misspelled or garbled by speech recognition
 - Be lenient with TRANSCRIPTION quality, but STRICT with conceptual accuracy
 
 QUESTION: {question_text}
@@ -234,6 +234,7 @@ MANDATORY SCORING RULES:
 8. CONCEPT vs SCENARIO: A student who says "I used this specific technical approach because I needed to handle this technical property" scores higher than one who says "My program processes these specific items" — even though the second is more 'specific' to the assignment.
 9. VALID BUT SUBOPTIMAL: If the student proposes a technical approach that WORKS correctly but isn't the most efficient, score 5-6 minimum — they understand the concept, just not the optimal approach. Only score 3-4 if the approach shows real conceptual gaps.
 10. BEGINNER LENIENCY: For difficulty {difficulty}/5, remember this student is a BEGINNER. At higher difficulties, don't expect expert-level answers — if they show they're on the right track conceptually, be generous.
+11. FOLLOW-UP CONSISTENCY: When scoring a follow-up answer, the score should reflect how well the student answered THIS specific question. If the student directly and correctly answers the follow-up question asked, do NOT score it lower than a vaguer answer to a previous question. A precise, correct response to the question asked should score 7+ regardless of what might be "missing" from the broader topic.
 
 ═══════════════════════════════════════════════════════════════
 FEEDBACK RULES — SOUND LIKE A REAL PERSON:
@@ -254,6 +255,7 @@ FEEDBACK RULES — SOUND LIKE A REAL PERSON:
    - "Not quite — here's the thing..."
    - "You've got the basic idea. Now..."
    Each response should feel like a unique, natural reaction from a real instructor.
+8. ⚠️ FACTUAL ACCURACY: Do NOT state language-specific implementation details as universal facts. Different programming languages implement the same concepts differently. Keep feedback language-agnostic unless the assignment's programming language is explicitly specified. If the student's answer is conceptually valid across common languages, accept it.
 
 ═══════════════════════════════════════════════════════════════
 MISCONCEPTION DETECTION (be thorough):
@@ -273,9 +275,9 @@ NEXT ACTION ROUTING:
 ═══════════════════════════════════════════════════════════════
 
 Based on the student's answer, decide the BEST NEXT ACTION for the conversation:
-- "advance": Use this if the student has demonstrated sufficient understanding (score 7+), OR if they are clearly stuck and won't benefit from more attempts at this exact concept.
-- "follow_up": Use this if the student shows PARTIAL or SURFACE understanding (score 3-6) and a specific Socratic follow-up question would help them connect the dots. Do not use this if they are completely lost.
-- "re_ask": Use this if the student's answer was completely incorrect, contradictory, or too vague to score (score 0-2), but they made a genuine attempt and might understand if given another chance to clarify.
+- "advance": Use this if the student has demonstrated sufficient understanding (score 7+). You MUST advance if the score is 7 or higher.
+- "follow_up": Use this ONLY if the student shows PARTIAL or SURFACE understanding (score 3-6) and a specific Socratic follow-up question would help them. Do NOT follow up if the score is 7+.
+- "re_ask": Use this if the student's answer was too vague or incorrect (score 0-2), but they made a genuine attempt and might clarify if asked again.
 
 ═══════════════════════════════════════════════════════════════
 JUSTIFICATION (required):
@@ -566,6 +568,8 @@ Return ONLY the teaching text, nothing else.""".strip()
         misconceptions: list[str] | None = None,
         code_context: str = "",
         conversation_history: str = "",
+        expected_answer: str = "",
+        justification: str = "",
     ) -> str | None:
         """Generate a single Socratic follow-up question via LLM.
 
@@ -590,20 +594,30 @@ Return ONLY the teaching text, nothing else.""".strip()
         if conversation_history:
             history_block = f"\n{conversation_history}\n"
 
+        expected_section = ""
+        if expected_answer:
+            expected_section = f"\nEXPECTED CONCEPTUAL ANSWER: {expected_answer}\n"
+
+        justification_section = ""
+        if justification:
+            justification_section = f"\nSCORE JUSTIFICATION (why the student lost marks): {justification}\n"
+
         prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT. The student gave an answer and you need to ask ONE follow-up question.
 
 ORIGINAL QUESTION: {question_text}
 STUDENT'S ANSWER: {student_answer}
 STUDENT'S SCORE: {score}/{max_score} (on the original question)
 EVALUATION FEEDBACK: {feedback}
-{misconception_section}{code_section}{history_block}
+{expected_section}{justification_section}{misconception_section}{code_section}{history_block}
 TECHNICAL CONCEPT BEING TESTED: {competency}
 DIFFICULTY LEVEL: {difficulty}/5
 
+⚠️ CRITICAL — TARGET THE ACTUAL GAP:
+Compare the STUDENT'S ANSWER against the EXPECTED ANSWER. The follow-up MUST probe the specific concept or detail the student MISSED or got wrong — not a tangential topic. If the expected answer mentions specific properties (e.g. fixed size, same data type) and the student didn't mention them, ask about THOSE properties.
+
 SCAFFOLDING RULES — MATCH THE STUDENT'S LEVEL:
 - If score was LOW (0-4): The student is STRUGGLING. Ask a SIMPLER, more basic question that breaks the technical concept into a smaller piece. Do NOT escalate complexity. Ask about the most fundamental aspect they should know.
-- If score was MEDIUM (5-6): The student has partial understanding. Ask about the specific technical gap — the ONE thing they're missing.
-- If score was HIGH (7-8): The student understands the basics. NOW you can probe slightly deeper — ask WHY or WHEN regarding the technical choices.
+- If score was MEDIUM (5-6): The student has partial understanding. Ask about the specific technical gap — the ONE thing they're missing. Do NOT follow up if the score is 7+.
 
 ⚠️ CRITICAL: NEVER ask a follow-up that is MORE COMPLEX than the original question. If a student scored 2/10, asking about advanced technical internals or complex optimizations is UNFAIR. Ask something simpler.
 
