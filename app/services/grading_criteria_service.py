@@ -161,14 +161,14 @@ PROGRAMMING CONCEPTS.
 Your job is to SEE THROUGH the scenario and identify the REAL topic:
 
 SCENARIO → REAL TECHNICAL TOPIC (examples):
-- "Count red and blue balls in a bag"       → LOOPS (iteration, counting patterns)
-- "Store and sort mountain heights"         → ARRAYS + SORTING ALGORITHMS
-- "Calculate student grade averages"        → LOOPS + ARITHMETIC OPERATIONS
-- "Build a library book tracker"            → OBJECT-ORIENTED PROGRAMMING (classes, objects)
-- "Read temperatures from a file"           → FILE I/O + DATA PROCESSING
-- "Check if a password meets requirements"  → CONDITIONALS (if/else logic, boolean expressions)
-- "Create a menu-driven calculator"         → FUNCTIONS + SWITCH/CASE or IF-ELSE CHAINS
-- "Track inventory with add/remove"         → DATA STRUCTURES (lists/arrays, CRUD operations)
+- "A scenario involving repetitive actions"      → TECHNICAL CONTROL STRUCTURES (iteration, patterns)
+- "A scenario involving collections of data"    → DATA STRUCTURES (storage, organization)
+- "A scenario involving calculations"           → ARITHMETIC OR LOGICAL OPERATIONS
+- "A scenario involving complex entities"       → STRUCTURAL DESIGN (classes, objects)
+- "A scenario involving external data"          → I/O OPERATIONS (data processing)
+- "A scenario involving decision making"        → CONDITIONAL LOGIC (branching, boolean expressions)
+- "A scenario involving modular tasks"          → MODULAR DESIGN (functions, abstraction)
+- "A scenario involving resource management"    → DATA MANAGEMENT (CRUD operations)
 
 The CRITERIA you generate must test whether the student understands THESE TECHNICAL
 CONCEPTS — not whether they know about balls, mountains, grades, or books.
@@ -183,20 +183,20 @@ one, would this competency still make sense?" If yes — it's a good competency.
 If no — you're testing the scenario, not the concept.
 
 GOOD competencies (concept-focused — these survive scenario changes):
-- "Understanding why a for-loop is used for a known number of iterations"
-- "Understanding the difference between for-loops and while-loops"
-- "Understanding why arrays are needed to store multiple related values"
-- "Understanding how conditional logic controls program flow"
-- "Understanding parameter passing in functions"
-- "Understanding how nested loops process 2D data"
+- "Understanding why a specific control structure is used for a known technical requirement"
+- "Understanding the technical difference between alternative implementation patterns"
+- "Understanding why specific data structures are needed to store related technical values"
+- "Understanding how technical logic controls program execution flow"
+- "Understanding technical parameter passing and data flow"
+- "Understanding how nested constructs process multi-dimensional data"
 
 BAD competencies (scenario-dependent — NEVER generate these):
-- "Purpose of counting red balls"           ← about balls, not loops
-- "Understanding mountain height storage"   ← about mountains, not arrays
-- "Explaining grade calculation"            ← about grades, not arithmetic
-- "Purpose of tracking library books"       ← about books, not OOP
-- "Understanding data organisation"         ← too vague, not a real concept
-- "Reading input from the user"             ← too generic, what concept does it test?
+- "Purpose of counting specific items in the scenario"
+- "Understanding how to store scenario-specific values"
+- "Explaining scenario-specific calculations"
+- "Purpose of tracking scenario-specific entities"
+- "Understanding vague data organization without technical context"
+- "Performing a generic action without a clear technical concept"
 
 ═══════════════════════════════════════════════════════════════
 WHAT MAKES A GOOD CRITERION — THE CONCEPT TEST
@@ -205,30 +205,30 @@ WHAT MAKES A GOOD CRITERION — THE CONCEPT TEST
 A good criterion checks: "Does the student understand WHY this programming concept
 exists, WHEN to use it, and HOW it works?"
 
-For LOOPS, good criteria probe:
-- Why do we need loops instead of copy-pasting code?
-- When would you use a for-loop vs a while-loop?
-- How does the loop know when to stop?
-- What happens if the loop condition is never false?
+For technical CONTROL STRUCTURES, good criteria probe:
+- Why do we need these structures instead of repetitive manual code?
+- When would you use one specific structure over another available option?
+- How does the structure determine its termination or continuation?
+- What happens under technically invalid or edge-case conditions?
 
-For ARRAYS, good criteria probe:
-- Why store values in an array instead of separate variables?
-- How do you access a specific element?
-- What happens if you go past the end of the array?
+For DATA STRUCTURES, good criteria probe:
+- Why store values in this specific structure instead of separate variables?
+- How do you technically access or manipulate specific elements?
+- What happens if technical boundaries or constraints are exceeded?
 
-For CONDITIONALS, good criteria probe:
-- Why do programs need to make decisions?
-- What's the difference between if-else and nested if?
-- How does combining conditions with AND/OR work?
+For CONDITIONAL LOGIC, good criteria probe:
+- Why do programs need to make technical decisions?
+- What is the difference between different types of branching logic?
+- How does combining complex technical conditions work?
 
-For FUNCTIONS, good criteria probe:
-- Why break code into functions instead of writing everything in main?
-- What's the difference between parameters and return values?
-- Why does a function need a return type?
+For MODULAR DESIGN, good criteria probe:
+- Why break code into smaller modules instead of one large block?
+- What is the technical difference between input parameters and output results?
+- Why does a technical module need specified types or interfaces?
 
 The questions CAN reference the assignment scenario for familiarity (e.g. "In your
-ball-counting program, why did you use a for-loop?") but the CONCEPT being tested
-must be the for-loop, not the balls.
+program, why did you choose this specific approach?") but the CONCEPT being tested
+must be the technical principle, not the scenario.
 
 ═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — CRITICAL CONSTRAINTS
@@ -251,28 +251,28 @@ Use the EXACT difficulty_level integer AND the EXACT level_label string shown be
 
 Level 1 — "Remember":
   Student recalls a specific fact about the TECHNICAL CONCEPT used in their program.
-  Example: "What type of loop did you use in your program?"
-  Example: "How many parameters does your main function take?"
+  Example: "What technical construct did you choose for this specific task?"
+  Example: "What are the technical properties of the approach you used?"
 
 Level 2 — "Understand":
   Student explains WHY a specific technical decision was made.
-  Example: "Why did you use a for-loop instead of a while-loop here?"
-  Example: "Why did you need an array instead of a single variable?"
+  Example: "Why did you choose this technical approach instead of an alternative one?"
+  Example: "Why was this specific technical structure needed for this requirement?"
 
 Level 3 — "Apply":
   Student describes HOW a technical concept works step-by-step.
-  Example: "Walk me through what happens in each iteration of your loop."
-  Example: "What would happen if the loop condition was changed to <=?"
+  Example: "Walk me through the technical steps that occur when this logic executes."
+  Example: "What would technically change if this parameter or condition was modified?"
 
 Level 4 — "Analyse":
   Student compares approaches or identifies trade-offs between technical choices.
-  Example: "Could you solve this with a while-loop instead? What would be different?"
-  Example: "What's the trade-off between using a fixed-size array vs a dynamic one?"
+  Example: "Could you solve this with a different technical method? What would be the trade-off?"
+  Example: "What is the technical difference between these two potential implementation approaches?"
 
 Level 5 — "Evaluate & Create":
   Student critiques or proposes improvements to their technical approach.
-  Example: "If the number of items wasn't known in advance, how would your approach change?"
-  Example: "What would break if you removed the boundary check in your loop?"
+  Example: "If technical constraints changed in this specific way, how would your approach adapt?"
+  Example: "What technical failure would occur if specific boundary checks were removed?"
 
 IMPORTANT CONSTRAINTS:
 - {count_instruction}

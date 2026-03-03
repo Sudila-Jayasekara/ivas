@@ -103,8 +103,8 @@ CONTEXT:
 THE GOLDEN RULE — TEST THE CONCEPT, NOT THE SCENARIO
 ═══════════════════════════════════════════════════════════════
 
-Every assignment uses a SCENARIO (balls, mountains, students, etc.) to teach
-a TECHNICAL CONCEPT (loops, arrays, conditionals, etc.). Your questions MUST
+Every assignment uses a SCENARIO (e.g., real-world entities or behaviors) to teach
+a TECHNICAL CONCEPT (the underlying programming principle). Your questions MUST
 test whether the student understands the CONCEPT — not the scenario.
 
 Ask yourself: "Would this question still make sense if the scenario changed
@@ -112,23 +112,23 @@ but the same programming concept was used?" If YES → good question.
 If NO → you're testing the scenario, rewrite it.
 
 GOOD questions (test the CONCEPT — survive scenario changes):
-- "Why did you use a for-loop here instead of a while-loop?"
-  → Tests: understanding of loop types (works regardless of scenario)
-- "What would happen if your loop condition was never true?"
-  → Tests: understanding of loop mechanics
-- "Why did you need an array instead of a single variable?"
-  → Tests: understanding of when arrays are needed
-- "What's the difference between passing by value and by reference?"
-  → Tests: understanding of parameter passing
+- "What is the primary technical reason for choosing this approach over an alternative?"
+  → Tests: comparative technical understanding
+- "How does this specific programming construct behave under edge-case conditions?"
+  → Tests: understanding of technical mechanics
+- "When is this particular technical solution necessary versus a simpler one?"
+  → Tests: understanding of technical requirements
+- "What are the fundamental principles governing this technical concept?"
+  → Tests: conceptual understanding
 
 BAD questions (test the SCENARIO — break if scenario changes):
-- "Why do we need to count the red balls?"
-  → Tests: the scenario, not the loop concept
-- "What does your program output when given 10 mountain heights?"
-  → Tests: specific program behavior, not understanding
-- "Why is it important to track student grades?"
+- "Why do we need to count the specific items in this scenario?"
+  → Tests: the scenario, not the technical concept
+- "What does your program output when given these specific inputs?"
+  → Tests: program behavior, not understanding
+- "Why is it important to track these specific real-world values?"
   → Tests: domain knowledge, not programming skill
-- "What is the main purpose of reading input?"
+- "What is the main purpose of this code?"
   → Too generic, doesn't test any specific concept
 
 The difference: GOOD questions have a definitive technical answer about
@@ -143,12 +143,11 @@ The expected_answer MUST be a conceptual explanation of the TECHNICAL CONCEPT.
 It should show understanding of WHY/WHEN/HOW the concept works — not describe
 what the student's specific program does.
 
-GOOD expected answer (for "Why a for-loop instead of while-loop?"):
-"A for-loop is better when you know exactly how many times to repeat. Since
-we know there are 10 items, a for-loop handles the counting automatically."
+GOOD expected answer (for "Why this approach over an alternative?"):
+"This approach is more efficient because it handles [technical property] automatically, whereas the alternative would require manual [technical process]."
 
 BAD expected answer:
-"The program reads 10 mountain heights and stores them in an array."
+"The program reads the specific inputs and stores them in the specified structure."
 (This describes WHAT the program does, not WHY the concept was used.)
 
 ═══════════════════════════════════════════════════════════════
@@ -174,28 +173,28 @@ Follow these rules STRICTLY:
 
 Level 1 — "Remember":
   → Ask the student to recall a fact about the TECHNICAL CONCEPT they used.
-  → Example: "What type of loop did you use in your program?"
-  → Example: "What data structure did you use to store the values?"
+  → Example: "What specific technical construct did you use for this requirement?"
+  → Example: "Which technical property is being utilized here?"
 
 Level 2 — "Understand":
   → Ask the student to EXPLAIN WHY they chose a specific technical approach.
-  → Example: "Why did you use a for-loop instead of a while-loop?"
-  → Example: "Why does your program need an array instead of separate variables?"
+  → Example: "Why did you choose this technical approach instead of a simpler one?"
+  → Example: "Why is this specific construct necessary for this task?"
 
 Level 3 — "Apply":
   → Ask how the technical concept works step by step.
-  → Example: "What happens in your loop when it reaches the last iteration?"
-  → Example: "What would happen if you changed the loop to start from 1 instead of 0?"
+  → Example: "What happens technically when this construct reaches a specific state?"
+  → Example: "What would the technical result be if we changed this parameter?"
 
 Level 4 — "Analyse":
   → Ask to compare technical approaches or identify concept trade-offs.
-  → Example: "Could you solve this with a while-loop instead? What would change?"
-  → Example: "What's the trade-off between sorting first vs finding the max directly?"
+  → Example: "Could you solve this using a different technical method? What would change?"
+  → Example: "What is the technical trade-off between these two approaches?"
 
 Level 5 — "Evaluate & Create":
   → Ask the student to critique or extend their technical approach.
-  → Example: "If you didn't know how many items there would be, how would your approach change?"
-  → Example: "What would break in your logic if the input was empty?"
+  → Example: "If the technical constraints changed in this way, how would your approach adapt?"
+  → Example: "What technical failure would occur if this specific boundary condition was met?"
 
 CRITICAL RULES:
 1. The question MUST be about "{competency}" specifically — the TECHNICAL CONCEPT.

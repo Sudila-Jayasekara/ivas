@@ -96,13 +96,13 @@ Decide the NEXT ACTION based on what the student actually MEANT:
    - Asking for clarification ("can you explain?", "what do you mean?", "I don't understand the question")
    - Asking to redo ("can I try again?", "let me redo this", "explain it more")
    - Asking for a hint ("can you give me a hint?")
-   - Expressing confusion about what's being asked ("what you mean beyond that loop")
+   - Expressing confusion about what's being asked ("I don't understand what you mean by that technical term")
    ⚠️ CRITICAL: If a student asks to redo or for more explanation, ALWAYS honor it. Never ignore a student's request for help.
 
 4. "clarify_relevance": The student is questioning WHY this topic is being asked — they don't see the connection to their assignment. This includes:
-   - "Why are you asking about loops? This is an arrays assignment"
-   - "What does this have to do with my code?"
-   - "This isn't relevant"
+   - "Why are you asking about this technical concept? My code does something else"
+   - "What does this technical detail have to do with my implementation?"
+   - "This technical property isn't relevant to my task"
    ⚠️ This is actually CRITICAL THINKING — the student deserves an explanation of why the topic matters.
 
 5. "warn_and_reask": The student is being abusive, offensive, or deliberately disruptive. Generate a firm but professional warning.
@@ -231,8 +231,8 @@ MANDATORY SCORING RULES:
 5. If the student's answer is partially right conceptually, give 5-6 and use "follow_up" to guide them.
 6. VAGUE answers ("it's easy", "it makes things work") without WHY/HOW get 1-3.
 7. Do NOT penalize for inability to recite code syntax.
-8. CONCEPT vs SCENARIO: A student who says "I used a for-loop because I knew there were exactly 10 items" scores higher than one who says "My program reads mountain heights" — even though the second is more 'specific' to the assignment.
-9. VALID BUT SUBOPTIMAL: If the student proposes an approach that WORKS correctly but isn't the most efficient (e.g. sorting the whole array to find top 3), score 5-6 minimum — they understand the concept, just not the optimal approach. Only score 3-4 if the approach shows real conceptual gaps.
+8. CONCEPT vs SCENARIO: A student who says "I used this specific technical approach because I needed to handle this technical property" scores higher than one who says "My program processes these specific items" — even though the second is more 'specific' to the assignment.
+9. VALID BUT SUBOPTIMAL: If the student proposes a technical approach that WORKS correctly but isn't the most efficient, score 5-6 minimum — they understand the concept, just not the optimal approach. Only score 3-4 if the approach shows real conceptual gaps.
 10. BEGINNER LENIENCY: For difficulty {difficulty}/5, remember this student is a BEGINNER. At higher difficulties, don't expect expert-level answers — if they show they're on the right track conceptually, be generous.
 
 ═══════════════════════════════════════════════════════════════
@@ -601,11 +601,11 @@ TECHNICAL CONCEPT BEING TESTED: {competency}
 DIFFICULTY LEVEL: {difficulty}/5
 
 SCAFFOLDING RULES — MATCH THE STUDENT'S LEVEL:
-- If score was LOW (0-4): The student is STRUGGLING. Ask a SIMPLER, more basic question that breaks the concept into a smaller piece. Do NOT escalate complexity. Ask about the most fundamental aspect they should know.
-- If score was MEDIUM (5-6): The student has partial understanding. Ask about the specific gap — the ONE thing they're missing.
-- If score was HIGH (7-8): The student understands the basics. NOW you can probe slightly deeper — ask WHY or WHEN.
+- If score was LOW (0-4): The student is STRUGGLING. Ask a SIMPLER, more basic question that breaks the technical concept into a smaller piece. Do NOT escalate complexity. Ask about the most fundamental aspect they should know.
+- If score was MEDIUM (5-6): The student has partial understanding. Ask about the specific technical gap — the ONE thing they're missing.
+- If score was HIGH (7-8): The student understands the basics. NOW you can probe slightly deeper — ask WHY or WHEN regarding the technical choices.
 
-⚠️ CRITICAL: NEVER ask a follow-up that is MORE COMPLEX than the original question. If a student scored 2/10, asking about algorithm internals or optimization is UNFAIR. Ask something simpler.
+⚠️ CRITICAL: NEVER ask a follow-up that is MORE COMPLEX than the original question. If a student scored 2/10, asking about advanced technical internals or complex optimizations is UNFAIR. Ask something simpler.
 
 GENERAL RULES:
 1. Ask exactly ONE concise follow-up question (1-2 sentences).
@@ -662,7 +662,7 @@ Your job: Briefly explain WHY this concept matters for their work. Be encouragin
 
 RULES:
 1. Keep it to 1-2 sentences.
-2. Be specific — explain the actual connection (e.g. "Loops are how you process every element in your array — without them, you'd have to handle each item manually!")
+2. Be specific — explain the actual connection (e.g. "This specific construct is how you handle this technical process — without it, you'd have to manage the data manually!")
 3. Sound like a real person, not a textbook.
 4. End with something encouraging that leads back to the question.
 5. Do NOT lecture or be condescending.
