@@ -619,14 +619,14 @@ class AssessmentService:
                 session_id, session_obj, resp, now
             )
 
-        # --- Socratic follow-up check (30-79% score) ---
+        # --- Routing based on LLM's next_action ---
+        action = eval_result.next_action if eval_result else "advance"
+
+        # --- Socratic follow-up check ---
         should_follow_up = (
-            eval_result is not None
+            action == "follow_up"
             and question_obj is not None
             and instance.follow_up_depth < MAX_FOLLOW_UP_DEPTH
-            and evaluation_service.is_partial_understanding(
-                eval_result.score, float(question_obj.max_points)
-            )
         )
 
         if should_follow_up:
@@ -686,15 +686,12 @@ class AssessmentService:
                     detected_misconceptions=resp.detected_misconceptions,
                 )
 
-        # --- Re-ask check (score < 30%) ---
-        if eval_result and question_obj:
-            max_pts = float(question_obj.max_points) if question_obj.max_points > 0 else 10.0
-            score_pct = eval_result.score / max_pts
-            if score_pct < 0.3:
-                reask_count = await self._count_reasks_for_question(
-                    session_id, instance
-                )
-                if reask_count < MAX_REASK_COUNT:
+        # --- Re-ask check ---
+        if action == "re_ask" and question_obj:
+            reask_count = await self._count_reasks_for_question(
+                session_id, instance
+            )
+            if reask_count < MAX_REASK_COUNT:
                     root_id = instance.parent_instance_id or instance.id
                     seq_result = await self.session.execute(
                         select(func.count())
