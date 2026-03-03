@@ -43,6 +43,7 @@ class EvaluationResult:
     misconceptions: list[str]
     competency_scores: dict[str, float]
     justification: str = ""  # LLM's reasoning for the given score
+    next_action: str = "advance"  # "advance" | "follow_up" | "re_ask"
 
 
 @dataclass
@@ -173,42 +174,32 @@ DIFFICULTY: {difficulty}/5
 MAX POINTS: {max_points}
 
 ═══════════════════════════════════════════════════════════════
-SCORING RUBRIC (apply STRICTLY):
+SCORING RUBRIC (be encouraging and fair to beginners):
 ═══════════════════════════════════════════════════════════════
 
-9-10 (EXCELLENT): Explains the concept accurately and thoroughly. Clear understanding of WHY/HOW. May reason beyond basics.
+9-10 (EXCELLENT): Explains the core concept accurately. Clear understanding. Spoken in simple, mostly correct terms.
 
-7-8 (GOOD): Core concept is correct. Main idea right but missing depth. Answer clearly addresses the question.
+7-8 (GOOD): Core concept is correct, even if explained very simply or briefly. Main idea is right.
 
-5-6 (ADEQUATE): Some relevant understanding but notable gaps. General area right but cannot explain WHY/HOW, OR mixes correct and incorrect ideas.
+5-6 (ADEQUATE): Shows partial understanding. Has the right general idea but might be missing a piece of the puzzle, or lacks some clarity.
 
-3-4 (WEAK): Minimal understanding. Mostly vague ("it's easy", "it's helpful") without explaining WHY or HOW. Touches the topic but misses the main point.
+3-4 (WEAK): Vague understanding. Touches on the topic but struggles to articulate the point.
 
-1-2 (INCORRECT): Answer is factually wrong, contradicts the expected answer, or shows fundamental misunderstanding.
+1-2 (INCORRECT): Answer is factually wrong, contradicts the expected answer entirely.
 
-0 (NO CREDIT): Non-answers, abuse, or zero content.
+0 (NO CREDIT): Non-answers, abuse, or zero conceptual content.
 
 ═══════════════════════════════════════════════════════════════
 MANDATORY SCORING RULES:
 ═══════════════════════════════════════════════════════════════
 
-1. COMPARE against the EXPECTED ANSWER. If the student CONTRADICTS it, score 1-2 max.
-
-2. Do NOT fabricate positive interpretations. Wrong is wrong. Do NOT say "You correctly identified..." for a wrong answer.
-
-3. VAGUE answers ("it's easy", "it's good", "we can use it") without WHY/HOW: 3-4 max.
-
-4. Bare agreement/disagreement without reasoning: 0-1.
-
-5. SHORT answers (under 15 meaningful words): max 5/{max_points} unless every word shows precise understanding.
-
-6. DIFFICULTY SCALING: At difficulty 4-5, expect analysis/comparison/reasoning. Surface-level answers at high difficulty score 2-3 lower than at difficulty 1-2.
-
-7. PARROTING ("because you said...", "you told me..."): max 5/{max_points}.
-
-8. WRONG + CONFIDENT scores LOWER than UNCERTAIN + RIGHT DIRECTION.
-
-9. Do NOT penalise for inability to recite code syntax — but the concept must be correct.
+1. COMPARE against the EXPECTED ANSWER. If the student captures the SPIRIT of the answer, reward them generously (7-10).
+2. Do NOT penalize for short answers. This is a verbal test. If they say the correct concept in 5 words, that is still a 9-10.
+3. BE LENIENT with terminology. If they say "keyboard" instead of "standard input", that is totally fine, do not dock points.
+4. If the student's answer is partially right, give them 5-6 points and use "follow_up" to guide them to the rest.
+5. VAGUE answers ("it's easy", "it's good") without WHY/HOW get lower scores, but if they attempt to explain, grant points for the attempt.
+6. DIFFICULTY SCALING: At difficulty 4-5, expect a bit more reasoning, but still be generous to beginners.
+7. Do NOT penalize for inability to recite code syntax.
 
 ═══════════════════════════════════════════════════════════════
 FEEDBACK RULES:
@@ -235,6 +226,15 @@ Flag a misconception whenever the student:
 If ANY misconception is present, it MUST be listed.
 
 ═══════════════════════════════════════════════════════════════
+NEXT ACTION ROUTING:
+═══════════════════════════════════════════════════════════════
+
+Based on the student's answer, decide the BEST NEXT ACTION for the conversation:
+- "advance": Use this if the student has demonstrated sufficient understanding (score 7+), OR if they are clearly stuck and won't benefit from more attempts at this exact concept.
+- "follow_up": Use this if the student shows PARTIAL or SURFACE understanding (score 3-6) and a specific Socratic follow-up question would help them connect the dots. Do not use this if they are completely lost.
+- "re_ask": Use this if the student's answer was completely incorrect, contradictory, or too vague to score (score 0-2), but they made a genuine attempt and might understand if given another chance to clarify.
+
+═══════════════════════════════════════════════════════════════
 JUSTIFICATION (required):
 ═══════════════════════════════════════════════════════════════
 
@@ -246,7 +246,8 @@ OUTPUT FORMAT (JSON only):
   "feedback": "Honest feedback to show the student...",
   "misconceptions": ["specific misconception if any"],
   "justification": "I gave X/{max_points} because the student [did/didn't]...",
-  "competency_scores": {{"{competency}": <same as score>}}
+  "competency_scores": {{"{competency}": <same as score>}},
+  "next_action": "advance"
 }}
 
 Return ONLY valid JSON.""".strip()
@@ -282,12 +283,17 @@ Return ONLY valid JSON.""".strip()
             if not isinstance(competency_scores, dict):
                 competency_scores = {competency: score}
 
+            action = str(data.get("next_action", "advance")).lower().strip()
+            if action not in ("advance", "follow_up", "re_ask"):
+                action = "advance"
+
             return EvaluationResult(
                 score=score,
                 feedback=feedback,
                 misconceptions=misconceptions,
                 competency_scores=competency_scores,
                 justification=justification,
+                next_action=action,
             )
         except (json.JSONDecodeError, ValueError, TypeError) as e:
             logger.error("Failed to parse evaluation: %s\n%s", e, raw[:500])
@@ -504,13 +510,6 @@ Return ONLY the teaching text, nothing else.""".strip()
     # ==================================================================
     # Socratic follow-up (real-time)
     # ==================================================================
-
-    def is_partial_understanding(self, score: float, max_points: float) -> bool:
-        """Return True if score indicates partial understanding (30-70% range)."""
-        if max_points <= 0:
-            return False
-        pct = score / max_points
-        return 0.3 <= pct < 0.7
 
     def generate_follow_up(
         self,
