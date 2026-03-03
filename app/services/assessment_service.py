@@ -48,10 +48,11 @@ from app.services.conversation_context import build_conversation_context
 logger = logging.getLogger(__name__)
 
 # --- Session & question flow limits ---
-MAX_TOTAL_EXCHANGES = 30        # Hard cap on total exchanges in a session
-MAX_EXCHANGES_PER_QUESTION = 3  # Max exchanges (root + follow-ups + re-asks) per bank question
-MAX_FOLLOW_UP_DEPTH = 1         # Max Socratic follow-ups per question chain
-MAX_REASK_COUNT = 1             # Max re-asks for low-score responses
+MAX_VIVA_QUESTIONS = 5              # How many distinct questions per viva session (change this to adjust)
+MAX_TOTAL_EXCHANGES = 30            # Hard cap on total exchanges in a session
+MAX_EXCHANGES_PER_QUESTION = 3      # Max exchanges (root + follow-ups + re-asks) per bank question
+MAX_FOLLOW_UP_DEPTH = 1             # Max Socratic follow-ups per question chain
+MAX_REASK_COUNT = 1                 # Max re-asks for low-score responses
 
 
 class AssessmentService:
@@ -327,13 +328,33 @@ class AssessmentService:
         Uses adaptive difficulty: picks the next question based on recent
         performance instead of always escalating.
         """
-        # Get already-asked question IDs (all instances, including follow-ups)
+        # Count distinct bank questions already asked
         asked_result = await self.session.execute(
             select(AssessmentQuestionInstance.question_id).where(
                 AssessmentQuestionInstance.session_id == session_id
             )
         )
         asked_ids = [row[0] for row in asked_result.all()]
+        distinct_questions_asked = len(set(asked_ids))
+
+        # --- Viva question limit ---
+        if distinct_questions_asked >= MAX_VIVA_QUESTIONS:
+            session_obj.status = "completed"
+            session_obj.completed_at = now
+            session_obj.trigger_reason = "task_completion"
+            await self._compute_session_scores(session_obj)
+            await self.session.flush()
+            return SubmitResponseResponse(
+                response_id=resp.id,
+                is_complete=True,
+                message=f"Assessment completed — {distinct_questions_asked} questions answered.",
+                evaluation_score=resp.evaluation_score,
+                feedback_text=resp.feedback_text,
+                detected_misconceptions=resp.detected_misconceptions,
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
+            )
 
         # --- Adaptive difficulty ---
         # Check recent scored performance to decide difficulty level
