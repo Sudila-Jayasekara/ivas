@@ -48,10 +48,11 @@ from app.services.conversation_context import build_conversation_context
 logger = logging.getLogger(__name__)
 
 # --- Session & question flow limits ---
-MAX_TOTAL_EXCHANGES = 30        # Hard cap on total exchanges in a session
-MAX_EXCHANGES_PER_QUESTION = 3  # Max exchanges (root + follow-ups + re-asks) per bank question
-MAX_FOLLOW_UP_DEPTH = 1         # Max Socratic follow-ups per question chain
-MAX_REASK_COUNT = 1             # Max re-asks for low-score responses
+MAX_VIVA_QUESTIONS = 5              # How many distinct questions per viva session (change this to adjust)
+MAX_TOTAL_EXCHANGES = 30            # Hard cap on total exchanges in a session
+MAX_EXCHANGES_PER_QUESTION = 3      # Max exchanges (root + follow-ups + re-asks) per bank question
+MAX_FOLLOW_UP_DEPTH = 1             # Max Socratic follow-ups per question chain
+MAX_REASK_COUNT = 1                 # Max re-asks for low-score responses
 
 
 class AssessmentService:
@@ -243,6 +244,75 @@ class AssessmentService:
         )
 
     # ------------------------------------------------------------------
+    # Adaptive difficulty computation
+    # ------------------------------------------------------------------
+
+    async def _compute_adaptive_difficulty(self, session_id: str) -> int:
+        """Compute the max difficulty for the next question based on recent performance.
+
+        Looks at the last 3 scored responses (excluding non-answers):
+        - avg < 40% → stay at or below the current difficulty (no escalation)
+        - avg 40-70% → allow +1 difficulty step
+        - avg > 70% → allow +2 difficulty step (normal progression)
+        - No data → default to difficulty 5 (no cap)
+        """
+        # Fetch last 3 scored responses (with actual scores, not non-answers)
+        result = await self.session.execute(
+            select(StudentResponse, AssessmentQuestionInstance)
+            .join(
+                AssessmentQuestionInstance,
+                StudentResponse.question_instance_id == AssessmentQuestionInstance.id,
+            )
+            .where(
+                StudentResponse.session_id == session_id,
+                StudentResponse.evaluation_score.is_not(None),
+                StudentResponse.evaluation_score > 0,  # Exclude non-answers
+            )
+            .order_by(StudentResponse.submitted_at.desc())
+            .limit(3)
+        )
+        rows = result.all()
+
+        if not rows:
+            return 5  # No scored data yet — no cap
+
+        # Compute average percentage
+        total_pct = 0.0
+        max_diff_seen = 1
+        for resp_obj, inst_obj in rows:
+            max_pts = 10.0  # default
+            pct = (resp_obj.evaluation_score / max_pts) * 100 if max_pts > 0 else 0
+            total_pct += pct
+            if inst_obj.difficulty > max_diff_seen:
+                max_diff_seen = inst_obj.difficulty
+
+        avg_pct = total_pct / len(rows)
+
+        if avg_pct < 40:
+            # Struggling — stay at current level, don't push higher
+            adaptive_max = max_diff_seen
+            logger.debug(
+                "Adaptive difficulty: avg=%.1f%% → capping at %d (struggling)",
+                avg_pct, adaptive_max,
+            )
+        elif avg_pct < 70:
+            # Moderate — allow one step up
+            adaptive_max = max_diff_seen + 1
+            logger.debug(
+                "Adaptive difficulty: avg=%.1f%% → capping at %d (moderate)",
+                avg_pct, adaptive_max,
+            )
+        else:
+            # Doing well — allow progression
+            adaptive_max = max_diff_seen + 2
+            logger.debug(
+                "Adaptive difficulty: avg=%.1f%% → capping at %d (good)",
+                avg_pct, adaptive_max,
+            )
+
+        return min(adaptive_max, 5)  # Never exceed difficulty 5
+
+    # ------------------------------------------------------------------
     # Advance to next bank question (or complete session)
     # ------------------------------------------------------------------
 
@@ -253,27 +323,71 @@ class AssessmentService:
         resp: StudentResponse,
         now: datetime,
     ) -> SubmitResponseResponse:
-        """Move to the next bank question, or complete the session if done."""
-        # Get already-asked question IDs (all instances, including follow-ups)
+        """Move to the next bank question, or complete the session if done.
+
+        Uses adaptive difficulty: picks the next question based on recent
+        performance instead of always escalating.
+        """
+        # Count distinct bank questions already asked
         asked_result = await self.session.execute(
             select(AssessmentQuestionInstance.question_id).where(
                 AssessmentQuestionInstance.session_id == session_id
             )
         )
         asked_ids = [row[0] for row in asked_result.all()]
+        distinct_questions_asked = len(set(asked_ids))
 
-        # Find next approved question
+        # --- Viva question limit ---
+        if distinct_questions_asked >= MAX_VIVA_QUESTIONS:
+            session_obj.status = "completed"
+            session_obj.completed_at = now
+            session_obj.trigger_reason = "task_completion"
+            await self._compute_session_scores(session_obj)
+            await self.session.flush()
+            return SubmitResponseResponse(
+                response_id=resp.id,
+                is_complete=True,
+                message=f"Assessment completed — {distinct_questions_asked} questions answered.",
+                evaluation_score=resp.evaluation_score,
+                feedback_text=resp.feedback_text,
+                detected_misconceptions=resp.detected_misconceptions,
+                final_score=session_obj.final_score,
+                max_score=session_obj.max_score,
+                competency_summary=session_obj.competency_summary,
+            )
+
+        # --- Adaptive difficulty ---
+        # Check recent scored performance to decide difficulty level
+        max_difficulty = await self._compute_adaptive_difficulty(session_id)
+
+        # Try to find a question at or below the adaptive difficulty
+        next_question = None
         next_q_result = await self.session.execute(
             select(Question)
             .where(
                 Question.assignment_id == session_obj.assignment_id,
                 Question.status == "approved",
                 Question.id.notin_(asked_ids),
+                Question.difficulty <= max_difficulty,
             )
             .order_by(Question.difficulty.asc())
             .limit(1)
         )
         next_question = next_q_result.scalar_one_or_none()
+
+        # Fallback: if no questions at/below adaptive level, try any remaining
+        if next_question is None:
+            next_q_result = await self.session.execute(
+                select(Question)
+                .where(
+                    Question.assignment_id == session_obj.assignment_id,
+                    Question.status == "approved",
+                    Question.id.notin_(asked_ids),
+                )
+                .order_by(Question.difficulty.asc())
+                .limit(1)
+            )
+            next_question = next_q_result.scalar_one_or_none()
 
         if next_question is None:
             session_obj.status = "completed"
@@ -560,6 +674,63 @@ class AssessmentService:
                 session_id, session_obj, resp, now
             )
 
+        if guard_result.action == "explain_and_reask":
+            # Student is asking for help understanding the question — honour their request
+            resp.evaluation_score = 0.0
+            resp.detected_misconceptions = []
+            resp.score_justification = f"Input guard: {guard_result.reason}"
+
+            if question_obj and question_obj.expected_answer:
+                explanation = await asyncio.to_thread(
+                    evaluation_service.generate_question_explanation,
+                    question_text=asked_text,
+                    expected_answer=question_obj.expected_answer,
+                    competency=instance.competency,
+                    difficulty=instance.difficulty,
+                    conversation_history=conversation_history,
+                )
+                resp.feedback_text = explanation
+            else:
+                resp.feedback_text = guard_result.explanation or (
+                    "Sure! Let me rephrase that for you. Give it your best shot!"
+                )
+
+            await self.session.flush()
+
+            # Re-ask the same question so the student gets another chance
+            if at_exchange_cap:
+                return await self._advance_to_next_question(
+                    session_id, session_obj, resp, now
+                )
+            return await self._reask_current_question(
+                session_id, instance, session_obj, resp, asked_text, now
+            )
+
+        if guard_result.action == "clarify_relevance":
+            # Student questions why this topic is being asked — explain and re-ask
+            resp.evaluation_score = 0.0
+            resp.detected_misconceptions = []
+            resp.score_justification = f"Input guard: {guard_result.reason}"
+
+            relevance_text = await asyncio.to_thread(
+                evaluation_service.generate_relevance_explanation,
+                question_text=asked_text,
+                competency=instance.competency,
+                assignment_context=session_obj.code_context or "",
+            )
+            resp.feedback_text = relevance_text
+
+            await self.session.flush()
+
+            # Re-ask the same question after explaining why it matters
+            if at_exchange_cap:
+                return await self._advance_to_next_question(
+                    session_id, session_obj, resp, now
+                )
+            return await self._reask_current_question(
+                session_id, instance, session_obj, resp, asked_text, now
+            )
+
         # ══════════════════════════════════════════════════════════════
         # LAYER 2 — LLM Quick Evaluation (real-time)
         # ══════════════════════════════════════════════════════════════
@@ -636,9 +807,14 @@ class AssessmentService:
                 student_answer=response_text,
                 feedback=eval_result.feedback,
                 competency=instance.competency,
+                score=eval_result.score,
+                max_score=question_obj.max_points,
+                difficulty=instance.difficulty,
                 misconceptions=eval_result.misconceptions,
                 code_context=session_obj.code_context or "",
                 conversation_history=conversation_history,
+                expected_answer=question_obj.expected_answer or "",
+                justification=eval_result.justification,
             )
 
             if follow_up_text:
