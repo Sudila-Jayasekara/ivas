@@ -686,6 +686,7 @@ class AssessmentService:
                     question_text=asked_text,
                     expected_answer=question_obj.expected_answer,
                     competency=instance.competency,
+                    difficulty=instance.difficulty,
                     conversation_history=conversation_history,
                 )
                 resp.feedback_text = explanation

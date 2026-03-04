@@ -205,36 +205,27 @@ MAX POINTS: {max_points}
 SCORING RUBRIC — BASED ON CONCEPT UNDERSTANDING
 ═══════════════════════════════════════════════════════════════
 
-Score based on how well the student demonstrates understanding of the
-TECHNICAL CONCEPT — not how well they describe the assignment scenario.
+Score based on how well the student understands the PROGRAMMING CONCEPT —
+not how well they describe the assignment scenario or what their program does.
 
-9-10 (EXCELLENT): Demonstrates clear understanding of the concept. Explains WHY/WHEN/HOW correctly using their own words.
-
-7-8 (GOOD): Core concept understanding is correct. May be brief or simply stated, but the technical idea is right.
-
-5-6 (ADEQUATE): Partial concept understanding. Has the right general idea but missing key aspects of WHY or HOW the concept works.
-
-3-4 (WEAK): Vague understanding. Mentions the concept but cannot explain WHY it's used or HOW it works.
-
-1-2 (INCORRECT): Answer shows fundamental misunderstanding of the concept. Confuses concepts or states something technically wrong.
-
+9-10 (EXCELLENT): Clearly explains WHY/WHEN/HOW the concept works in their own words.
+7-8 (GOOD): Core concept is correct, even if brief or simply stated.
+5-6 (ADEQUATE): Right general idea but missing key aspects of WHY or HOW.
+3-4 (WEAK): Mentions the concept but can't explain WHY it's used or HOW it works.
+1-2 (INCORRECT): Fundamental misunderstanding — confuses concepts or states something wrong.
 0 (NO CREDIT): Non-answers, abuse, or zero conceptual content.
 
 ═══════════════════════════════════════════════════════════════
-MANDATORY SCORING RULES:
+SCORING RULES:
 ═══════════════════════════════════════════════════════════════
 
-1. COMPARE against the EXPECTED ANSWER. If the student captures the CONCEPT described in the expected answer, reward them generously (7-10).
-2. If the student describes what their program does WITHOUT explaining the concept, score 3-5 max — they're describing behavior, not demonstrating understanding.
-3. Do NOT penalize for short answers. If they explain the concept correctly in 5 words, that is still 9-10.
-4. BE LENIENT with terminology. If they say "keyboard" instead of "standard input", that is totally fine.
-5. If the student's answer is partially right conceptually, give 5-6 and use "follow_up" to guide them.
-6. VAGUE answers ("it's easy", "it makes things work") without WHY/HOW get 1-3.
-7. Do NOT penalize for inability to recite code syntax.
-8. CONCEPT vs SCENARIO: A student who says "I used this specific technical approach because I needed to handle this technical property" scores higher than one who says "My program processes these specific items" — even though the second is more 'specific' to the assignment.
-9. VALID BUT SUBOPTIMAL: If the student proposes a technical approach that WORKS correctly but isn't the most efficient, score 5-6 minimum — they understand the concept, just not the optimal approach. Only score 3-4 if the approach shows real conceptual gaps.
-10. BEGINNER LENIENCY: For difficulty {difficulty}/5, remember this student is a BEGINNER. At higher difficulties, don't expect expert-level answers — if they show they're on the right track conceptually, be generous.
-11. FOLLOW-UP CONSISTENCY: When scoring a follow-up answer, the score should reflect how well the student answered THIS specific question. If the student directly and correctly answers the follow-up question asked, do NOT score it lower than a vaguer answer to a previous question. A precise, correct response to the question asked should score 7+ regardless of what might be "missing" from the broader topic.
+1. COMPARE against the EXPECTED ANSWER. If the student captures the same CONCEPT, reward them (7-10).
+2. Describing what the program does WITHOUT explaining the concept = 3-5 max.
+3. Do NOT penalize for short answers, informal language, speech-to-text garbling, or inability to recite code syntax. If the concept is right in 5 words, that's still 9-10.
+4. VAGUE answers ("it's easy", "it makes things work") without WHY/HOW = 1-3.
+5. VALID BUT SUBOPTIMAL approach that works correctly = 5-6 minimum.
+6. BEGINNER LENIENCY: For difficulty {difficulty}/5, if they show they're on the right track conceptually, be generous.
+7. FOLLOW-UP CONSISTENCY: Score based on how well they answered THIS specific question. A precise, correct response to a follow-up should score 7+ regardless of what might be "missing" from the broader topic.
 
 ═══════════════════════════════════════════════════════════════
 FEEDBACK RULES — SOUND LIKE A REAL PERSON:
@@ -244,18 +235,15 @@ FEEDBACK RULES — SOUND LIKE A REAL PERSON:
 2. NEVER say "You correctly identified..." when the answer is wrong.
 3. For WRONG: State what's incorrect, then guide toward the right concept.
 4. For PARTIALLY CORRECT: Acknowledge what's right, state what's missing.
-5. For GOOD: Confirm understanding and suggest how to deepen it.
+5. For GOOD: Confirm understanding briefly.
 6. Keep to 1-3 sentences.
-7. ⚠️ VARY YOUR LANGUAGE! Do NOT use the same opening phrase repeatedly. NEVER start with "That's a good start!" — use natural, varied responses like a real human would. Examples of good variety:
+7. ⚠️ VARY YOUR LANGUAGE — never repeat opening phrases. Use natural reactions:
    - "You're on the right track — ..."
    - "Exactly right! ..."
    - "Close! The key thing you're missing is..."
    - "I see what you mean, but..."
-   - "Nice thinking! To take it further..."
    - "Not quite — here's the thing..."
-   - "You've got the basic idea. Now..."
-   Each response should feel like a unique, natural reaction from a real instructor.
-8. ⚠️ FACTUAL ACCURACY: Do NOT state language-specific implementation details as universal facts. Different programming languages implement the same concepts differently. Keep feedback language-agnostic unless the assignment's programming language is explicitly specified. If the student's answer is conceptually valid across common languages, accept it.
+8. Keep feedback language-agnostic unless the programming language is specified. Accept answers that are conceptually valid across languages.
 
 ═══════════════════════════════════════════════════════════════
 MISCONCEPTION DETECTION (be thorough):
@@ -411,11 +399,13 @@ DIFFICULTY: {difficulty}/5
 SCORE GIVEN: {score}/{max_points}
 INITIAL FEEDBACK: {feedback}
 
+IMPORTANT: Focus your analysis on the student's understanding of the PROGRAMMING CONCEPT ({competency}), not their knowledge of the assignment's scenario or domain.
+
 Provide analysis:
 
-1. JUSTIFICATION: Why is the score of {score}/{max_points} appropriate? What did the student get right vs wrong vs the expected answer?
+1. JUSTIFICATION: Why is the score of {score}/{max_points} appropriate? What did the student get right vs wrong about the CONCEPT?
 
-2. MISCONCEPTIONS: List ALL conceptual misconceptions the student demonstrated. Be thorough. If none, say so.
+2. MISCONCEPTIONS: List ALL conceptual misconceptions about the PROGRAMMING CONCEPT. Be thorough. If none, say so.
 
 3. UNDERSTANDING LEVEL: Rate as: "none", "surface", "partial", "solid", "deep"
    - none: No relevant understanding
@@ -424,7 +414,7 @@ Provide analysis:
    - solid: Core concept understood, minor gaps
    - deep: Thorough understanding with reasoning ability
 
-4. SUGGESTIONS: 2-3 specific, actionable learning suggestions.
+4. SUGGESTIONS: 2-3 specific, actionable learning suggestions about the PROGRAMMING CONCEPT.
 
 OUTPUT FORMAT (JSON only):
 {{
@@ -521,13 +511,15 @@ Return ONLY valid JSON.""".strip()
         prompt = f"""You are a kind, real human tutor during an oral viva. The student can't answer this question. Briefly teach the concept so they learn, then we move on.
 
 QUESTION THAT WAS ASKED: {question_text}
-EXPECTED ANSWER: {expected_answer}
-COMPETENCY: {competency}
+COMPETENCY (the programming concept): {competency}
 {history_block}
+NOTE — The expected answer is shown for YOUR reference only to understand what concept to teach:
+EXPECTED ANSWER: {expected_answer}
+
 RULES:
 1. Start warmly ("No worries!", "That's okay!", "Don't stress!") — never shame them. VARY your opening — don't always use the same phrase.
-2. Give a CONCEPTUAL NUDGE in 1-2 simple sentences — help them understand the KEY IDEA without dumping the full technical answer.
-3. Do NOT give away the complete answer or advanced details. Focus on the ONE core idea they need.
+2. Give a CONCEPTUAL NUDGE in 1-2 simple sentences — help them understand the KEY IDEA. Do NOT repeat or paraphrase the expected answer. Instead, give them a simplified mental model or analogy.
+3. Do NOT give away the complete answer, specific details, or technical terminology from the expected answer. Focus on the ONE core idea.
 4. End with encouragement like "Let's move on to the next question."
 5. Keep it SHORT — max 3 sentences total.
 6. Do NOT ask any questions — this is a teaching moment, not a quiz.
@@ -602,32 +594,56 @@ Return ONLY the teaching text, nothing else.""".strip()
         if justification:
             justification_section = f"\nSCORE JUSTIFICATION (why the student lost marks): {justification}\n"
 
-        prompt = f"""You are a Socratic tutor during an oral viva checking CONCEPTUAL UNDERSTANDING of a TECHNICAL PROGRAMMING CONCEPT. The student gave an answer and you need to ask ONE follow-up question.
+        prompt = f"""You are a Socratic tutor during an oral viva. The student answered a question and you need to ask ONE follow-up to help them understand the PROGRAMMING CONCEPT better.
 
 ORIGINAL QUESTION: {question_text}
 STUDENT'S ANSWER: {student_answer}
-STUDENT'S SCORE: {score}/{max_score} (on the original question)
+STUDENT'S SCORE: {score}/{max_score}
 EVALUATION FEEDBACK: {feedback}
 {expected_section}{justification_section}{misconception_section}{code_section}{history_block}
-TECHNICAL CONCEPT BEING TESTED: {competency}
+PROGRAMMING CONCEPT BEING TESTED: {competency}
 DIFFICULTY LEVEL: {difficulty}/5
 
-⚠️ CRITICAL — TARGET THE ACTUAL GAP:
-Compare the STUDENT'S ANSWER against the EXPECTED ANSWER. The follow-up MUST probe the specific concept or detail the student MISSED or got wrong — not a tangential topic. If the expected answer mentions specific properties (e.g. fixed size, same data type) and the student didn't mention them, ask about THOSE properties.
+═══════════════════════════════════════════════════════════════
+⚠️ MOST IMPORTANT RULE: DIFFICULTY MUST STAY THE SAME OR GO DOWN
+═══════════════════════════════════════════════════════════════
 
-SCAFFOLDING RULES — MATCH THE STUDENT'S LEVEL:
-- If score was LOW (0-4): The student is STRUGGLING. Ask a SIMPLER, more basic question that breaks the technical concept into a smaller piece. Do NOT escalate complexity. Ask about the most fundamental aspect they should know.
-- If score was MEDIUM (5-6): The student has partial understanding. Ask about the specific technical gap — the ONE thing they're missing. Do NOT follow up if the score is 7+.
+The original question was difficulty {difficulty}/5. Your follow-up MUST be
+at difficulty {difficulty}/5 or LOWER. NEVER ask something harder.
 
-⚠️ CRITICAL: NEVER ask a follow-up that is MORE COMPLEX than the original question. If a student scored 2/10, asking about advanced technical internals or complex optimizations is UNFAIR. Ask something simpler.
+The student scored {score}/{max_score}. A student who scored that low needs
+a SIMPLER question, not a harder one.
 
+═══════════════════════════════════════════════════════════════
+SCAFFOLDING BY SCORE — FOLLOW THESE EXAMPLES:
+═══════════════════════════════════════════════════════════════
+
+IF SCORE WAS LOW (0-4) — student is STRUGGLING, ask something BASIC:
+  Original: "Why did you use a for loop here?"
+  BAD follow-up: "What's the time complexity of your loop?" (too advanced!)
+  BAD follow-up: "How would you optimize this with recursion?" (way too hard!)
+  GOOD follow-up: "What does a loop do in general?" (basic recall)
+  GOOD follow-up: "What would happen if you didn't use a loop?" (simple reasoning)
+
+  Original: "Why store data in an array instead of separate variables?"
+  BAD follow-up: "Explain how array memory allocation works" (too advanced!)
+  GOOD follow-up: "What is an array?" (basic recall)
+  GOOD follow-up: "If you had 100 values, would you want 100 variable names?" (guides thinking)
+
+IF SCORE WAS MEDIUM (5-6) — student has partial understanding, target the GAP:
+  Compare the student's answer to the expected answer. Find the ONE thing they missed.
+  Original: "Why use a for loop?" Student said "to repeat code" but missed "when you know how many times"
+  GOOD follow-up: "How does the loop know when to stop?" (targets the specific gap)
+
+═══════════════════════════════════════════════════════════════
 GENERAL RULES:
-1. Ask exactly ONE concise follow-up question (1-2 sentences).
-2. Focus on the TECHNICAL CONCEPT — not the assignment scenario.
+═══════════════════════════════════════════════════════════════
+1. Ask exactly ONE concise question (1-2 sentences max, under 25 words).
+2. Focus on the PROGRAMMING CONCEPT — not the assignment scenario or domain.
 3. Do NOT ask them to write or recite code.
 4. Do NOT reveal the answer — guide their thinking.
-5. Keep it conversational and encouraging, like a real person.
-6. Do NOT use forced analogies (NO apples, fruits, baskets, cookies).
+5. Keep it conversational and encouraging.
+6. Do NOT use forced analogies (NO apples, fruits, cookies, pizza).
 7. If a misconception was detected, gently challenge it.
 8. If conversation history shows previous follow-ups, ask about a DIFFERENT aspect.
 
@@ -707,6 +723,7 @@ Return ONLY the explanation text, nothing else.""".strip()
         question_text: str,
         expected_answer: str,
         competency: str,
+        difficulty: int = 1,
         conversation_history: str = "",
     ) -> str:
         """Re-explain a question more simply when the student asks for clarification.
@@ -720,9 +737,10 @@ Return ONLY the explanation text, nothing else.""".strip()
         prompt = f"""You are a kind instructor during an oral viva. The student is asking you to explain or clarify the question. They WANT to try answering but need help understanding what you're asking.
 
 ORIGINAL QUESTION: {question_text}
-TECHNICAL CONCEPT: {competency}
+PROGRAMMING CONCEPT: {competency}
+DIFFICULTY LEVEL: {difficulty}/5
 {history_block}
-Your job: Re-explain the question in SIMPLER words so the student can understand and attempt an answer.
+Your job: Re-explain the question in SIMPLER words so the student can understand and attempt an answer. Match your explanation complexity to difficulty level {difficulty}/5 — for lower levels use very simple everyday language, for higher levels you can use slightly more technical terms.
 
 RULES:
 1. Start with something warm like "Sure!" or "Of course!" — show you're happy to help.

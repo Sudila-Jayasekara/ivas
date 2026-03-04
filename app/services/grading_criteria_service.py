@@ -150,53 +150,51 @@ ASSIGNMENT TEXT:
 \"\"\"
 
 ═══════════════════════════════════════════════════════════════
-STEP 1 (MOST IMPORTANT): IDENTIFY THE CORE TECHNICAL TOPIC(S)
+STEP 1 (MOST IMPORTANT): IDENTIFY THE PROGRAMMING CONSTRUCTS USED
 ═══════════════════════════════════════════════════════════════
 
-Before generating ANY criteria, you MUST first identify WHAT TECHNICAL CONCEPT(S)
-this assignment is designed to teach. Every assignment uses a SCENARIO (e.g. counting
-balls, managing students, sorting mountains) as a VEHICLE to teach one or more
-PROGRAMMING CONCEPTS.
+Before generating ANY criteria, you MUST read the assignment and identify the
+SPECIFIC PROGRAMMING CONSTRUCTS the student's code would use. Ignore the
+assignment's scenario/story entirely — focus only on the CODE.
 
-Your job is to SEE THROUGH the scenario and identify the REAL topic:
+Look for constructs like:
+- Loops (for, while, do-while) — why they're used, how they terminate
+- Arrays / Lists — why store in a collection vs separate variables
+- Conditionals (if/else, switch) — why branching is needed
+- Functions / Methods — why modularize, parameters vs return values
+- Classes / Structs — why group data and behavior together
+- File I/O — why read/write external data
+- String manipulation — how text is processed
+- Nested structures — why loops inside loops, arrays of arrays, etc.
+- Error handling — why validate input, what happens on bad data
 
-SCENARIO → REAL TECHNICAL TOPIC (examples):
-- "A scenario involving repetitive actions"      → TECHNICAL CONTROL STRUCTURES (iteration, patterns)
-- "A scenario involving collections of data"    → DATA STRUCTURES (storage, organization)
-- "A scenario involving calculations"           → ARITHMETIC OR LOGICAL OPERATIONS
-- "A scenario involving complex entities"       → STRUCTURAL DESIGN (organizing related data and behavior)
-- "A scenario involving external data"          → I/O OPERATIONS (data processing)
-- "A scenario involving decision making"        → CONDITIONAL LOGIC (branching, boolean expressions)
-- "A scenario involving modular tasks"          → MODULAR DESIGN (decomposition, reusability)
-- "A scenario involving resource management"    → DATA MANAGEMENT (CRUD operations)
-
-The CRITERIA you generate must test whether the student understands THESE TECHNICAL
-CONCEPTS — not whether they know about balls, mountains, grades, or books.
+The CRITERIA you generate must test whether the student understands THESE
+PROGRAMMING CONSTRUCTS — not the assignment's scenario, story, or domain.
 
 ═══════════════════════════════════════════════════════════════
-STEP 2: BUILD COMPETENCIES AROUND THE TECHNICAL CONCEPT
+STEP 2: BUILD COMPETENCIES AROUND THE PROGRAMMING CONSTRUCTS
 ═══════════════════════════════════════════════════════════════
 
-Each competency MUST be framed as understanding of the TECHNICAL CONCEPT.
-Ask yourself: "If I removed the scenario and replaced it with a completely different
-one, would this competency still make sense?" If yes — it's a good competency.
-If no — you're testing the scenario, not the concept.
+Each competency MUST name a SPECIFIC PROGRAMMING CONSTRUCT (e.g. "for loops",
+"arrays", "if-else branching", "functions with parameters").
 
-GOOD competencies (concept-focused — these survive scenario changes):
-- "Understanding why a specific control structure is used for a known technical requirement"
-- "Understanding the technical difference between alternative implementation patterns"
-- "Understanding why specific data structures are needed to store related technical values"
-- "Understanding how technical logic controls program execution flow"
-- "Understanding technical parameter passing and data flow"
-- "Understanding how nested constructs process multi-dimensional data"
+Ask yourself: "If I changed the assignment scenario but kept the same code
+constructs, would this competency still apply?" If yes → good. If no → rewrite.
 
-BAD competencies (scenario-dependent — NEVER generate these):
-- "Purpose of counting specific items in the scenario"
-- "Understanding how to store scenario-specific values"
-- "Explaining scenario-specific calculations"
-- "Purpose of tracking scenario-specific entities"
-- "Understanding vague data organization without technical context"
-- "Performing a generic action without a clear technical concept"
+GOOD competencies (name specific constructs):
+- "Understanding why a for loop is used instead of writing repetitive code"
+- "Understanding why data is stored in an array instead of separate variables"
+- "Understanding how if-else conditions control which code path executes"
+- "Understanding why code is split into functions with parameters and return values"
+- "Understanding how nested loops process multi-dimensional data"
+- "Understanding why input validation prevents runtime errors"
+
+BAD competencies (vague or scenario-focused — NEVER generate these):
+- "Purpose of counting balls in the game" (scenario-specific)
+- "Understanding how student grades are stored" (scenario-specific)
+- "Explaining the calculation logic" (too vague, no construct named)
+- "Understanding data organization" (too vague, no construct named)
+- "Performing the sorting operation" (describes task, not concept)
 
 ═══════════════════════════════════════════════════════════════
 WHAT MAKES A GOOD CRITERION — THE CONCEPT TEST

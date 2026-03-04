@@ -100,55 +100,53 @@ CONTEXT:
 - Learning Objectives: {objectives}
 
 ═══════════════════════════════════════════════════════════════
-THE GOLDEN RULE — TEST THE CONCEPT, NOT THE SCENARIO
+THE GOLDEN RULE — TEST THE PROGRAMMING CONCEPT, NOT THE SCENARIO
 ═══════════════════════════════════════════════════════════════
 
-Every assignment uses a SCENARIO (e.g., real-world entities or behaviors) to teach
-a TECHNICAL CONCEPT (the underlying programming principle). Your questions MUST
-test whether the student understands the CONCEPT — not the scenario.
+Every assignment uses a SCENARIO (e.g., students, grades, animals, games) to teach
+a PROGRAMMING CONCEPT (loops, arrays, functions, etc.). Your questions MUST test
+whether the student understands the CONCEPT — not the scenario.
 
-Ask yourself: "Would this question still make sense if the scenario changed
-but the same programming concept was used?" If YES → good question.
-If NO → you're testing the scenario, rewrite it.
+Test: "Would this question still make sense if the scenario changed
+but the same programming construct was used?" If YES → good. If NO → rewrite.
 
-GOOD questions (test the CONCEPT — survive scenario changes):
-- "What is the primary technical reason for choosing this approach over an alternative?"
-  → Tests: comparative technical understanding
-- "How does this specific programming construct behave under edge-case conditions?"
-  → Tests: understanding of technical mechanics
-- "When is this particular technical solution necessary versus a simpler one?"
-  → Tests: understanding of technical requirements
-- "What are the fundamental principles governing this technical concept?"
-  → Tests: conceptual understanding
+GOOD questions (name specific constructs):
+- "Why did you use a for loop instead of writing the same code multiple times?"
+  → Tests: understanding of loops / iteration
+- "Why store the values in an array instead of separate variables?"
+  → Tests: understanding of arrays / collections
+- "What does your if-else condition check, and why is that check needed?"
+  → Tests: understanding of conditional logic
+- "Why did you put this code in a separate function?"
+  → Tests: understanding of modular design
+- "How does your loop know when to stop?"
+  → Tests: understanding of loop termination
 
-BAD questions (test the SCENARIO — break if scenario changes):
-- "Why do we need to count the specific items in this scenario?"
-  → Tests: the scenario, not the technical concept
-- "What does your program output when given these specific inputs?"
-  → Tests: program behavior, not understanding
-- "Why is it important to track these specific real-world values?"
-  → Tests: domain knowledge, not programming skill
-- "What is the main purpose of this code?"
-  → Too generic, doesn't test any specific concept
+BAD questions (test the scenario or are too vague):
+- "Why do you need to count the students?" (scenario-specific)
+- "What does your program output?" (describes behavior, not concept)
+- "Why is it important to track grades?" (domain knowledge)
+- "What is the main purpose of this code?" (too generic)
+- "Explain your approach" (too vague, no specific construct)
 
-The difference: GOOD questions have a definitive technical answer about
-the programming concept. BAD questions are about the scenario or so generic
-that anyone could answer without understanding the concept.
+Do NOT ask questions that require knowledge of the assignment's specific
+inputs, outputs, entities, or domain to answer. The student should be able
+to answer based on their understanding of the PROGRAMMING CONCEPT alone.
 
 ═══════════════════════════════════════════════════════════════
-EXPECTED ANSWERS — MUST DEMONSTRATE CONCEPTUAL UNDERSTANDING
+EXPECTED ANSWERS — MUST EXPLAIN THE CONCEPT
 ═══════════════════════════════════════════════════════════════
 
-The expected_answer MUST be a conceptual explanation of the TECHNICAL CONCEPT.
-It should show understanding of WHY/WHEN/HOW the concept works — not describe
-what the student's specific program does.
+The expected_answer MUST explain WHY/WHEN/HOW the programming concept works.
+It should NOT describe what the student's specific program does.
 
-GOOD expected answer (for "Why this approach over an alternative?"):
-"This approach is more efficient because it handles [technical property] automatically, whereas the alternative would require manual [technical process]."
+GOOD expected answer (for "Why use a for loop instead of repeating code?"):
+"A for loop lets you repeat the same instructions many times without writing
+them out each time. It's useful when you know how many times you need to repeat."
 
 BAD expected answer:
-"The program reads the specific inputs and stores them in the specified structure."
-(This describes WHAT the program does, not WHY the concept was used.)
+"The program reads 5 student names and stores them one by one."
+(Describes program behavior, not the concept.)
 
 ═══════════════════════════════════════════════════════════════
 VOICE-FIRST DESIGN — THIS IS A SPOKEN ASSESSMENT
@@ -172,43 +170,43 @@ The question MUST match the Bloom's level "{level_label}" (difficulty {difficult
 Follow these rules STRICTLY:
 
 Level 1 — "Remember":
-  → Ask the student to recall a fact about the TECHNICAL CONCEPT they used.
-  → Example: "What specific technical construct did you use for this requirement?"
-  → Example: "Which technical property is being utilized here?"
+  → Ask the student to identify or name the programming construct they used.
+  → Example: "What type of loop did you use in your code?"
+  → Example: "What data structure did you use to store the values?"
 
 Level 2 — "Understand":
-  → Ask the student to EXPLAIN WHY they chose a specific technical approach.
-  → Example: "Why did you choose this technical approach instead of a simpler one?"
-  → Example: "Why is this specific construct necessary for this task?"
+  → Ask the student to EXPLAIN WHY they used a specific construct.
+  → Example: "Why did you use a for loop instead of writing the code out each time?"
+  → Example: "Why store the data in an array instead of separate variables?"
 
 Level 3 — "Apply":
-  → Ask how the technical concept works step by step.
-  → Example: "What happens technically when this construct reaches a specific state?"
-  → Example: "What would the technical result be if we changed this parameter?"
+  → Ask how the construct works step by step in a specific situation.
+  → Example: "What happens when your loop reaches the last element?"
+  → Example: "What would change if you used a while loop instead of a for loop?"
 
 Level 4 — "Analyse":
-  → Ask to compare technical approaches or identify concept trade-offs.
-  → Example: "Could you solve this using a different technical method? What would change?"
-  → Example: "What is the technical trade-off between these two approaches?"
+  → Ask to compare constructs or identify trade-offs.
+  → Example: "What's the difference between using a for loop and a while loop here?"
+  → Example: "Could you solve this without using an array? What would be harder?"
 
 Level 5 — "Evaluate & Create":
-  → Ask the student to critique or extend their technical approach.
-  → Example: "If the technical constraints changed in this way, how would your approach adapt?"
-  → Example: "What technical failure would occur if this specific boundary condition was met?"
+  → Ask the student to critique or extend their approach.
+  → Example: "What would break in your code if the input had zero items?"
+  → Example: "How would you change your approach if the data came from a file instead?"
 
 CRITICAL RULES:
-1. The question MUST be about "{competency}" specifically — the TECHNICAL CONCEPT.
-2. The question MUST use the action verbs for "{level_label}" level ONLY.
+1. The question MUST be about "{competency}" specifically — the PROGRAMMING CONCEPT.
+2. The question MUST match "{level_label}" level ONLY.
 3. Maximum 30 words in the question — SHORT and DIRECT.
-4. The expected_answer must demonstrate CONCEPTUAL UNDERSTANDING (not describe program behavior) in 1-3 spoken sentences (under 60 words).
+4. The expected_answer must explain the CONCEPT (not describe program behavior) in 1-3 spoken sentences (under 60 words).
 5. Do NOT ask multi-part questions. ONE question, ONE thing to answer.
 6. Do NOT require code syntax in the answer. Accept conceptual explanations.
 7. All questions are scored out of 10 points — do NOT include max_points in output.
-8. Questions MUST test the TECHNICAL CONCEPT — NOT domain/scenario knowledge.
+8. Questions MUST test the PROGRAMMING CONCEPT — NOT domain/scenario knowledge.
 9. Do NOT use forced or unrelated analogies (NO apples, fruits, baskets, cookies, pizza, etc.).
 10. {overlap_rule}
-11. LOGICAL COHERENCE: The question must make sense in the context of the concept being tested.
-12. STRICT EXPECTED ANSWER MATCH: The expected answer must be a correct conceptual explanation that directly answers the question.
+11. The question must make logical sense in the context of the concept being tested.
+12. The expected answer must directly and correctly answer the question.
 
 OUTPUT FORMAT ({output_count_note}, no other text):
 [

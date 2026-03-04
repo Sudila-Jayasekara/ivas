@@ -1,4 +1,20 @@
 services:
+  app:
+    build: .
+    container_name: ${APP_NAME:-ivas}-app
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     container_name: ${APP_NAME:-ivas}-postgres
@@ -7,7 +23,7 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-learn_go_db}
+      POSTGRES_DB: ${DB_NAME:-ivas_db}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
