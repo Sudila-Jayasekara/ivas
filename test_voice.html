@@ -227,19 +227,65 @@
       el.scrollTop = el.scrollHeight
     }
 
-    /* ── TTS via browser speechSynthesis ── */
-    function speakText(text, cancelPrevious = false) {
-      if (!window.speechSynthesis) {
-        log('speechSynthesis not supported', 'err')
+    /* ── TTS via backend Base64 Audio ── */
+    const audioQueue = []
+    let isPlaying = false
+
+    function playAudio(base64Data, cancelPrevious = false) {
+      if (!base64Data) return
+
+      if (cancelPrevious) {
+        audioQueue.length = 0
+        const audioElements = document.getElementsByTagName('audio')
+        for (let audio of audioElements) {
+          audio.pause()
+          audio.currentTime = 0
+        }
+        isPlaying = false
+      }
+
+      // Convert base64 to blob URL
+      const byteCharacters = atob(base64Data)
+      const byteNumbers = new Array(byteCharacters.length)
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i)
+      }
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'audio/mp3' })
+      const url = URL.createObjectURL(blob)
+
+      audioQueue.push(url)
+
+      if (!isPlaying) {
+        playNextInQueue()
+      }
+    }
+
+    function playNextInQueue() {
+      if (audioQueue.length === 0) {
+        isPlaying = false
         return
       }
-      if (cancelPrevious) {
-        window.speechSynthesis.cancel()
+
+      isPlaying = true
+      const url = audioQueue.shift()
+      const audio = new Audio(url)
+
+      audio.onended = () => {
+        URL.revokeObjectURL(url) // cleanup
+        playNextInQueue()
       }
-      const utt = new SpeechSynthesisUtterance(text)
-      utt.rate = 0.95
-      utt.pitch = 1.0
-      window.speechSynthesis.speak(utt)
+
+      audio.onerror = (e) => {
+        log('Error playing audio', 'err')
+        URL.revokeObjectURL(url)
+        playNextInQueue()
+      }
+
+      audio.play().catch(e => {
+        log('Audio playback prevented by browser policy (needs user interaction first)', 'err')
+        isPlaying = false
+      })
     }
 
     /* ── update question panel ── */
@@ -294,10 +340,9 @@
 
           case 'instructor_response':
             log('Instructor: ' + msg.message, 'inst')
-            speakText(msg.message)
+            playAudio(msg.audio_b64, true)
             if (msg.repeat_question) {
               log('Question: ' + msg.repeat_question, 'q')
-              speakText(msg.repeat_question)
             }
             document.getElementById('btnRecord').disabled = false
             break
@@ -307,8 +352,8 @@
             log('Feedback: ' + (msg.feedback ?? ''), 'eval')
             if (msg.misconceptions && msg.misconceptions.length)
               log('Misconceptions: ' + msg.misconceptions.join(', '), 'eval')
-            // Speak the feedback
-            if (msg.feedback) speakText(msg.feedback)
+            // Play the feedback
+            if (msg.audio_b64) playAudio(msg.audio_b64, true)
             break
 
           case 'next_question':
@@ -320,7 +365,7 @@
             showQuestion(msg.question_text, msg.is_follow_up)
             log('--- ' + (msg.is_follow_up ? 'Follow-up' : 'Question ' + questionNumber) + ' ---', 'q')
             log(msg.question_text, 'q')
-            speakText(msg.question_text)
+            if (msg.audio_b64) playAudio(msg.audio_b64)
             document.getElementById('btnRecord').disabled = false
             break
 
@@ -331,7 +376,9 @@
             if (msg.competency_summary)
               msg.competency_summary.forEach(c =>
                 log('  ' + c.competency + ': ' + (c.percentage ?? 0).toFixed(0) + '%  (' + c.scored + '/' + c.max + ')', 'done'))
-            speakText('Assessment complete. Your final score is ' + msg.final_score + ' out of ' + msg.max_score)
+
+            if (msg.audio_b64) playAudio(msg.audio_b64, true)
+
             document.getElementById('btnRecord').disabled = true
             document.getElementById('qType').textContent = 'Assessment complete'
             break
@@ -371,7 +418,14 @@
       if (!SpeechRecognition) return
 
       // Stop any ongoing TTS so it doesn't interfere with mic
-      window.speechSynthesis && window.speechSynthesis.cancel()
+      // Stop the base64 audio queue
+      audioQueue.length = 0
+      const audioElements = document.getElementsByTagName('audio')
+      for (let audio of audioElements) {
+        audio.pause()
+        audio.currentTime = 0
+      }
+      isPlaying = false
 
       recognition = new SpeechRecognition()
       recognition.continuous = true
