@@ -56,6 +56,7 @@ from app.models.question import Question
 from app.services.assessment_service import AssessmentService
 from app.services.conversation_context import build_conversation_context, MAX_CLARIFICATIONS_BEFORE_ESCALATION
 from app.services.voice_service import StudentIntent, voice_service
+from app.services.tts_service import generate_audio_b64
 
 logger = logging.getLogger(__name__)
 
@@ -345,11 +346,14 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                     if classification.intent == StudentIntent.REPEAT_REQUEST:
                         repeat_q = current_question_text
 
+                    audio_b64 = await generate_audio_b64(response_text)
+                    
                     await websocket.send_json({
                         "type": "instructor_response",
                         "message": response_text,
                         "intent": classification.intent.value,
                         "repeat_question": repeat_q,
+                        "audio_b64": audio_b64,
                     })
 
                     # Store conversational exchange in DB (fire & forget)
@@ -393,15 +397,19 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                     # Advance to the next unanswered question
                     current_qiid = next_q["question_instance_id"]
                     current_question_text = next_q["question_text"]
+                    
+                    msg_text = "I've already recorded your answer for that question. Here's the next one."
+                    audio_b64 = await generate_audio_b64(msg_text)
+                    
                     await websocket.send_json({
                         "type": "instructor_response",
-                        "message": (
-                            "I've already recorded your answer for that question. "
-                            "Here's the next one."
-                        ),
+                        "message": msg_text,
                         "intent": "duplicate",
                         "repeat_question": None,
+                        "audio_b64": audio_b64,
                     })
+                    
+                    next_audio_b64 = await generate_audio_b64(next_q["question_text"])
                     await websocket.send_json({
                         "type": "next_question",
                         "question_instance_id": next_q["question_instance_id"],
@@ -409,17 +417,18 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                         "competency": next_q["competency"],
                         "difficulty": next_q["difficulty"],
                         "is_follow_up": next_q["is_follow_up"],
+                        "audio_b64": next_audio_b64,
                     })
                 else:
                     # All questions answered — wrap up
+                    msg_text = "I've already recorded your answer. It looks like you've answered all the questions!"
+                    audio_b64 = await generate_audio_b64(msg_text)
                     await websocket.send_json({
                         "type": "instructor_response",
-                        "message": (
-                            "I've already recorded your answer. "
-                            "It looks like you've answered all the questions!"
-                        ),
+                        "message": msg_text,
                         "intent": "duplicate",
                         "repeat_question": None,
+                        "audio_b64": audio_b64,
                     })
                 continue
 
@@ -454,39 +463,52 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                     friendly += "There was a question tracking issue. Please continue speaking."
                 else:
                     friendly += "Please try again."
+                audio_b64 = await generate_audio_b64(friendly)
                 await websocket.send_json({
                     "type": "instructor_response",
                     "message": friendly,
                     "intent": "error_recovery",
                     "repeat_question": current_question_text or None,
+                    "audio_b64": audio_b64,
                 })
                 continue
             except Exception as exc:
                 logger.error("Unexpected error in submit_response: %r", exc, exc_info=True)
+                msg_text = "I had trouble processing that. Could you please repeat your answer?"
+                audio_b64 = await generate_audio_b64(msg_text)
                 await websocket.send_json({
                     "type": "instructor_response",
-                    "message": "I had trouble processing that. Could you please repeat your answer?",
+                    "message": msg_text,
                     "intent": "error_recovery",
                     "repeat_question": current_question_text or None,
+                    "audio_b64": audio_b64,
                 })
                 continue
 
             # Send evaluation result
+            # Optional: Generate TTS for the feedback itself
+            feedback_audio_b64 = None
+            if result.feedback_text:
+                feedback_audio_b64 = await generate_audio_b64(result.feedback_text)
+            
             await websocket.send_json({
                 "type": "evaluation",
                 "score": result.evaluation_score,
                 "feedback": result.feedback_text,
                 "misconceptions": result.detected_misconceptions or [],
+                "audio_b64": feedback_audio_b64,
             })
 
             # Session complete
             if result.is_complete:
+                audio_b64 = await generate_audio_b64(f"Assessment complete. Your final score is {result.final_score} out of {result.max_score}")
                 await websocket.send_json({
                     "type": "session_complete",
                     "final_score": result.final_score,
                     "max_score": result.max_score,
                     "message": result.message,
                     "competency_summary": result.competency_summary or [],
+                    "audio_b64": audio_b64,
                 })
                 break
 
@@ -495,17 +517,21 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
             if nq is None:
                 # Edge case: not complete but no next question — treat as complete
                 logger.warning("No next question but session not marked complete")
+                audio_b64 = await generate_audio_b64("Assessment completed.")
                 await websocket.send_json({
                     "type": "session_complete",
                     "final_score": result.final_score or 0,
                     "max_score": result.max_score or 0,
                     "message": "Assessment completed.",
                     "competency_summary": result.competency_summary or [],
+                    "audio_b64": audio_b64,
                 })
                 break
 
             current_question_text = nq.question_text
             current_qiid = nq.question_instance_id
+
+            next_audio_b64 = await generate_audio_b64(nq.question_text)
 
             await websocket.send_json({
                 "type": "next_question",
@@ -514,6 +540,7 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                 "competency": nq.competency,
                 "difficulty": nq.difficulty,
                 "is_follow_up": nq.is_follow_up,
+                "audio_b64": next_audio_b64,
             })
 
     except WebSocketDisconnect:
