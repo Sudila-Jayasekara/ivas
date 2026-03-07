@@ -5,13 +5,9 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/api/v1/assessments/sessions/:session_id/respond
+  url: {{baseUrl}}/api/v1/assessments/sessions/e4088b81-8d3e-4e37-9156-a0cd7acfcb48/respond
   body: json
   auth: none
-}
-
-params:path {
-  session_id: {{session_id}}
 }
 
 headers {

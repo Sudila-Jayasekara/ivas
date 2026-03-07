@@ -238,6 +238,20 @@ async def voice_assessment(websocket: WebSocket, session_id: str) -> None:
                 current_question_text = msg.get("question_text", "")
                 current_qiid = msg.get("question_instance_id", "")
                 logger.info("Session context set: qiid=%s", current_qiid)
+                
+                # Automatically speak the first question to the student
+                if current_question_text:
+                    try:
+                        first_audio_b64 = await generate_audio_b64(current_question_text)
+                        await websocket.send_json({
+                            "type": "instructor_response",
+                            "message": current_question_text,
+                            "intent": "greeting",
+                            "repeat_question": None,
+                            "audio_b64": first_audio_b64,
+                        })
+                    except Exception as e:
+                        logger.error("Failed to generate TTS for first question: %s", e)
                 continue
 
             # ── Accept any text from the student ───────────────────────

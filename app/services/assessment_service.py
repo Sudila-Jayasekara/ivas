@@ -28,6 +28,8 @@ from app.models.assessment import (
 )
 from app.models.question import Question
 from app.schemas.assessment import (
+    AssessmentTranscriptOut,
+    ExchangeOut,
     HintResponse,
     InstructorAssessmentSummary,
     PauseSessionResponse,
