@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_assessment_service
 from app.schemas.assessment import (
+    HintRequest,
+    PauseSessionRequest,
     SubmitResponseRequest,
     TriggerAssessmentRequest,
 )
@@ -98,3 +100,43 @@ async def abandon_session(
         raise HTTPException(status_code=500, detail=msg)
 
     return {"message": "Session abandoned successfully"}
+
+
+@router.post("/sessions/{session_id}/hint")
+async def request_hint(
+    session_id: str,
+    req: HintRequest,
+    svc: AssessmentService = Depends(get_assessment_service),
+):
+    try:
+        resp = await svc.request_hint(session_id, req.question_instance_id)
+        return resp
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/sessions/{session_id}/pause")
+async def pause_session(
+    session_id: str,
+    req: PauseSessionRequest,
+    svc: AssessmentService = Depends(get_assessment_service),
+):
+    try:
+        resp = await svc.pause_session(session_id)
+        return resp
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/sessions/{session_id}/resume")
+async def resume_session(
+    session_id: str,
+    svc: AssessmentService = Depends(get_assessment_service),
+):
+    try:
+        resp = await svc.resume_session(session_id)
+        return resp
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

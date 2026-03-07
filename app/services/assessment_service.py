@@ -28,11 +28,12 @@ from app.models.assessment import (
 )
 from app.models.question import Question
 from app.schemas.assessment import (
-    AssessmentTranscriptOut,
-    ExchangeOut,
+    HintResponse,
     InstructorAssessmentSummary,
+    PauseSessionResponse,
     QuestionInstanceOut,
     QuestionWithContext,
+    ResumeSessionResponse,
     SessionDetailsOut,
     SessionOut,
     StudentResponseOut,
@@ -41,7 +42,7 @@ from app.schemas.assessment import (
     TriggerAssessmentRequest,
     TriggerAssessmentResponse,
 )
-from app.services.evaluation_service import evaluation_service
+from app.services.evaluation_service import evaluation_service, InputGuardResult
 from app.services.background_analysis import run_background_analysis
 from app.services.conversation_context import build_conversation_context
 
@@ -675,36 +676,71 @@ class AssessmentService:
             )
 
         if guard_result.action == "explain_and_reask":
-            # Student is asking for help understanding the question — honour their request
-            resp.evaluation_score = 0.0
-            resp.detected_misconceptions = []
-            resp.score_justification = f"Input guard: {guard_result.reason}"
-
-            if question_obj and question_obj.expected_answer:
-                explanation = await asyncio.to_thread(
-                    evaluation_service.generate_question_explanation,
-                    question_text=asked_text,
-                    expected_answer=question_obj.expected_answer,
-                    competency=instance.competency,
-                    difficulty=instance.difficulty,
-                    conversation_history=conversation_history,
+            # Safety valve: if the student has already been re-asked multiple times
+            # for this question chain, force evaluation instead of looping forever.
+            # This prevents the frustrating cycle where messy-but-genuine answers
+            # keep getting classified as "needs help" and never scored.
+            root_question_id = instance.question_id
+            prior_explains_result = await self.session.execute(
+                select(func.count())
+                .select_from(StudentResponse)
+                .join(
+                    AssessmentQuestionInstance,
+                    StudentResponse.question_instance_id == AssessmentQuestionInstance.id,
                 )
-                resp.feedback_text = explanation
-            else:
-                resp.feedback_text = guard_result.explanation or (
-                    "Sure! Let me rephrase that for you. Give it your best shot!"
+                .where(
+                    AssessmentQuestionInstance.session_id == session_id,
+                    AssessmentQuestionInstance.question_id == root_question_id,
+                    StudentResponse.input_classification == "explain_and_reask",
                 )
-
-            await self.session.flush()
-
-            # Re-ask the same question so the student gets another chance
-            if at_exchange_cap:
-                return await self._advance_to_next_question(
-                    session_id, session_obj, resp, now
-                )
-            return await self._reask_current_question(
-                session_id, instance, session_obj, resp, asked_text, now
             )
+            prior_explain_count = prior_explains_result.scalar() or 0
+
+            if prior_explain_count >= 2:
+                # Student has tried enough times — force through to evaluation
+                logger.info(
+                    "explain_and_reask safety valve: %d prior explain_and_reask "
+                    "responses for question %s — forcing evaluation",
+                    prior_explain_count, root_question_id,
+                )
+                guard_result = InputGuardResult(
+                    action="evaluate",
+                    reason="explain_reask_cap_reached — forcing evaluation after repeated re-asks",
+                )
+                resp.input_classification = "evaluate"
+                await self.session.flush()
+                # Fall through to Layer 2 evaluation below
+            else:
+                # Honour the request — re-explain and re-ask
+                resp.evaluation_score = 0.0
+                resp.detected_misconceptions = []
+                resp.score_justification = f"Input guard: {guard_result.reason}"
+
+                if question_obj and question_obj.expected_answer:
+                    explanation = await asyncio.to_thread(
+                        evaluation_service.generate_question_explanation,
+                        question_text=asked_text,
+                        expected_answer=question_obj.expected_answer,
+                        competency=instance.competency,
+                        difficulty=instance.difficulty,
+                        conversation_history=conversation_history,
+                    )
+                    resp.feedback_text = explanation
+                else:
+                    resp.feedback_text = guard_result.explanation or (
+                        "Sure! Let me rephrase that for you. Give it your best shot!"
+                    )
+
+                await self.session.flush()
+
+                # Re-ask the same question so the student gets another chance
+                if at_exchange_cap:
+                    return await self._advance_to_next_question(
+                        session_id, session_obj, resp, now
+                    )
+                return await self._reask_current_question(
+                    session_id, instance, session_obj, resp, asked_text, now
+                )
 
         if guard_result.action == "clarify_relevance":
             # Student questions why this topic is being asked — explain and re-ask
@@ -1017,6 +1053,143 @@ class AssessmentService:
         session_obj.status = "abandoned"
         session_obj.completed_at = datetime.now(timezone.utc)
         await self.session.flush()
+
+    # ------------------------------------------------------------------
+    # Pause / Resume
+    # ------------------------------------------------------------------
+
+    async def pause_session(self, session_id: str) -> PauseSessionResponse:
+        result = await self.session.execute(
+            select(AssessmentSession).where(AssessmentSession.id == session_id)
+        )
+        session_obj = result.scalar_one_or_none()
+        if session_obj is None:
+            raise ValueError("session not found")
+        if session_obj.status != "in_progress":
+            raise ValueError(f"cannot pause session in status '{session_obj.status}'")
+
+        session_obj.status = "paused"
+        await self.session.flush()
+        return PauseSessionResponse(status="paused", message="Session paused successfully")
+
+    async def resume_session(self, session_id: str) -> ResumeSessionResponse:
+        result = await self.session.execute(
+            select(AssessmentSession).where(AssessmentSession.id == session_id)
+        )
+        session_obj = result.scalar_one_or_none()
+        if session_obj is None:
+            raise ValueError("session not found")
+        if session_obj.status != "paused":
+            raise ValueError(f"cannot resume session in status '{session_obj.status}'")
+
+        session_obj.status = "in_progress"
+        await self.session.flush()
+
+        # Fetch last question instance to return as current_question
+        q_result = await self.session.execute(
+            select(AssessmentQuestionInstance)
+            .where(AssessmentQuestionInstance.session_id == session_id)
+            .order_by(AssessmentQuestionInstance.sequence_number.desc())
+            .limit(1)
+        )
+        last_inst = q_result.scalar_one_or_none()
+        
+        current_q = None
+        if last_inst:
+            # Check if this question was already answered
+            ans_result = await self.session.execute(
+                select(func.count())
+                .select_from(StudentResponse)
+                .where(
+                    StudentResponse.question_instance_id == last_inst.id,
+                    ~StudentResponse.voice_intent.in_(self._CONVERSATIONAL_INTENTS)
+                    | StudentResponse.voice_intent.is_(None)
+                )
+            )
+            is_answered = (ans_result.scalar() or 0) > 0
+            
+            if not is_answered:
+                # Fetch question details
+                bank_q_result = await self.session.execute(
+                    select(Question).where(Question.id == last_inst.question_id)
+                )
+                bank_q = bank_q_result.scalar_one_or_none()
+                
+                current_q = QuestionWithContext(
+                    question_id=last_inst.question_id,
+                    question_instance_id=last_inst.id,
+                    question_text=last_inst.follow_up_question_text or (bank_q.question_text if bank_q else ""),
+                    competency=last_inst.competency,
+                    difficulty=last_inst.difficulty,
+                    code_context=session_obj.code_context or "",
+                    is_follow_up=last_inst.parent_instance_id is not None,
+                    question_type="follow_up" if last_inst.follow_up_depth > 0 else "new"
+                )
+
+        return ResumeSessionResponse(
+            status="in_progress",
+            current_question=current_q,
+            message="Session resumed successfully"
+        )
+
+    # ------------------------------------------------------------------
+    # Hint
+    # ------------------------------------------------------------------
+
+    async def request_hint(
+        self, session_id: str, question_instance_id: str
+    ) -> HintResponse:
+        # Fetch session
+        result = await self.session.execute(
+            select(AssessmentSession).where(AssessmentSession.id == session_id)
+        )
+        session_obj = result.scalar_one_or_none()
+        if session_obj is None:
+            raise ValueError("session not found")
+        
+        # Fetch question instance
+        inst_result = await self.session.execute(
+            select(AssessmentQuestionInstance).where(
+                AssessmentQuestionInstance.id == question_instance_id,
+                AssessmentQuestionInstance.session_id == session_id
+            )
+        )
+        instance = inst_result.scalar_one_or_none()
+        if instance is None:
+            raise ValueError("invalid question instance")
+
+        # Fetch bank question for expected answer
+        q_result = await self.session.execute(
+            select(Question).where(Question.id == instance.question_id)
+        )
+        question_obj = q_result.scalar_one_or_none()
+        if not question_obj:
+            raise ValueError("bank question not found")
+
+        # Build conversation history
+        conv_ctx = await build_conversation_context(self.session, question_instance_id)
+        
+        # Generate hint using evaluation service
+        hint_text = await asyncio.to_thread(
+            evaluation_service.generate_teaching_hint,
+            question_text=instance.follow_up_question_text or question_obj.question_text,
+            expected_answer=question_obj.expected_answer or "",
+            competency=instance.competency,
+            conversation_history=conv_ctx.history_text,
+        )
+
+        # Count total hints used in this session (input_classification = 'hint_requested' or similar)
+        # For now, we'll just return 1 as a placeholder or count 'hint' voice intents if stored
+        # Let's count responses with a special classification or intent if we were to store them.
+        # Since we don't store hints as "StudentResponse" typically unless they say it, 
+        # we might want to store a record of hint being given if we want to track it.
+        # For this prototype, we just return the text.
+        
+        return HintResponse(
+            hint_text=hint_text,
+            penalty_applied=False,
+            total_hints_used=1 # Placeholder
+        )
 
     # ------------------------------------------------------------------
     # Instructor assessments

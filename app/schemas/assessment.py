@@ -173,3 +173,32 @@ class AssessmentTranscriptOut(BaseModel):
     final_score: float | None = None
     max_score: float | None = None
     competency_summary: list[dict] | None = None
+# --- Hint ---
+
+class HintRequest(BaseModel):
+    session_id: str
+    question_instance_id: str
+
+
+class HintResponse(BaseModel):
+    hint_text: str
+    penalty_applied: bool = False
+    total_hints_used: int = 0
+
+
+# --- Pause / Resume ---
+
+class PauseSessionRequest(BaseModel):
+    session_id: str
+    reason: str | None = None
+
+
+class PauseSessionResponse(BaseModel):
+    status: str = "paused"
+    message: str = "Session paused"
+
+
+class ResumeSessionResponse(BaseModel):
+    status: str = "in_progress"
+    current_question: QuestionWithContext | None = None
+    message: str = "Session resumed"

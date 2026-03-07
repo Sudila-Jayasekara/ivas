@@ -82,38 +82,53 @@ STUDENT SAID: "{student_answer}"
 {history_block}
 Decide the NEXT ACTION based on what the student actually MEANT:
 
-1. "evaluate": The student is genuinely ATTEMPTING to answer the question with conceptual content — even if wrong, vague, partial, or poorly worded. There must be REAL topical content to score.
+═══════════════════════════════════════════════════════════════
+⚠️ MOST IMPORTANT RULE — DEFAULT TO "evaluate"
+═══════════════════════════════════════════════════════════════
+When in doubt, ALWAYS choose "evaluate".
+It is FAR better to evaluate a confused/messy answer (and give it a low score with helpful feedback)
+than to refuse to evaluate a genuine attempt.
 
-2. "teach_and_skip": The student has NO conceptual content to evaluate. This includes:
+A student saying something WRONG or UNCLEAR about the topic IS an answer attempt — NOT a request for help.
+Fragmented sentences, garbled speech, or poorly articulated ideas are STILL answer attempts if they
+contain ANY words related to the topic being asked about.
+
+═══════════════════════════════════════════════════════════════
+
+1. "evaluate": The student is genuinely ATTEMPTING to answer the question with conceptual content — even if wrong, vague, partial, fragmented, or poorly worded. Choose this if there are ANY topic-related words or ideas in the response.
+   Examples that MUST be "evaluate":
+   - "Loop check condition if true it repeat" → EVALUATE (talking about loops!)
+   - "we use for loop set variable check condition" → EVALUATE (describing loop mechanics!)
+   - "array is like memory address shelf number" → EVALUATE (discussing arrays!)
+   - "two loops one for x axis one for y axis" → EVALUATE (explaining nested loops!)
+   - Any response mentioning technical terms related to the question → EVALUATE
+
+2. "teach_and_skip": The student has absolutely NO conceptual content to evaluate. This includes:
    - Explicitly doesn't know ("I don't know", "no idea")
    - Wants to skip ("can we skip?", "next question")
    - Deflections with zero technical content ("because I'm lazy", "I just do")
    - Bare affirmations with NO reasoning ("yes", "I think so", "maybe")
    - Empty acknowledgements ("ok", "sure", "right")
-   ⚠️ CRITICAL: A deflection like "because I'm lazy" is NOT an attempt to answer. Do NOT evaluate it — the student is avoiding the question, not demonstrating a misconception.
+   ⚠️ CRITICAL: A deflection like "because I'm lazy" is NOT an attempt to answer. Do NOT evaluate it.
 
-3. "explain_and_reask": The student is asking YOU for help understanding the question. They want to try but need guidance first. This includes:
+3. "explain_and_reask": ONLY when the student is EXPLICITLY asking YOU a question or requesting help. They must be directing a question or request AT YOU. This includes:
    - Asking for clarification ("can you explain?", "what do you mean?", "I don't understand the question")
-   - Asking to redo ("can I try again?", "let me redo this", "explain it more")
+   - Asking to redo ("can I try again?", "let me redo this")
    - Asking for a hint ("can you give me a hint?")
-   - Expressing confusion about what's being asked ("I don't understand what you mean by that technical term")
-   ⚠️ CRITICAL: If a student asks to redo or for more explanation, ALWAYS honor it. Never ignore a student's request for help.
+   ⚠️ CRITICAL: This is ONLY for when the student is asking YOU something. If the student is ANSWERING (even badly), choose "evaluate" instead. A messy, fragmented, or wrong answer is NOT a request for help — it is an answer attempt.
 
-4. "clarify_relevance": The student is questioning WHY this topic is being asked — they don't see the connection to their assignment. This includes:
-   - "Why are you asking about this technical concept? My code does something else"
-   - "What does this technical detail have to do with my implementation?"
-   - "This technical property isn't relevant to my task"
-   ⚠️ This is actually CRITICAL THINKING — the student deserves an explanation of why the topic matters.
+4. "clarify_relevance": The student is questioning WHY this topic is being asked — they don't see the connection to their assignment.
+   - "Why are you asking about this?"
+   - "What does this have to do with my code?"
 
 5. "warn_and_reask": The student is being abusive, offensive, or deliberately disruptive. Generate a firm but professional warning.
 
-GUIDANCE FOR A REAL INSTRUCTOR:
-- If the student says ANYTHING with real topical content (even incorrect), choose "evaluate"
-- If there is no conceptual content at all (deflections, bare "yes/no", acknowledgements), choose "teach_and_skip"
-- If the student is asking for YOUR help to understand the question, choose "explain_and_reask" — a real instructor would NEVER ignore a student asking for help
-- If the student questions why a topic matters, choose "clarify_relevance" — explain the connection
-- Only choose "warn_and_reask" for genuinely abusive or offensive content
-- Speech-to-text may garble words — be generous in interpretation
+DECISION CHECKLIST (follow in order):
+1. Does the response contain ANY words related to the topic/question? → "evaluate"
+2. Is the student explicitly asking YOU a question or requesting help? → "explain_and_reask"
+3. Is the student questioning why the topic matters? → "clarify_relevance"
+4. Is the response abusive or offensive? → "warn_and_reask"
+5. Is there zero content at all? → "teach_and_skip"
 
 Return ONLY valid JSON:
 For evaluate/teach_and_skip: {{"action": "<action>", "reason": "brief explanation"}}

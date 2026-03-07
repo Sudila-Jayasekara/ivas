@@ -16,19 +16,19 @@ headers {
 
 body:json {
   {
-    "student_id": "stud-001",
-    "assignment_id": "assign-007",
+    "student_id": "4220e987-8f0b-4196-b691-6c33620d4238",
+    "assignment_id": "assign-009",
     "code_context": ""
   }
 }
 
 script:post-response {
-  const data = res.getBody();
+  // const data = res.getBody();
   
-  if(data.session_id && data.first_question.question_instance_id){
-  bru.setVar("session_id", data.session_id);
-  bru.setVar("question_instance_id", data.first_question.question_instance_id);
-  }
+  // if(data.session_id && data.first_question.question_instance_id){
+  // bru.setVar("session_id", data.session_id);
+  // bru.setVar("question_instance_id", data.first_question.question_instance_id);
+  // }
 }
 
 docs {
