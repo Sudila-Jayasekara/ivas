@@ -8,6 +8,7 @@ are then serialized back to the client.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.api.deps import get_assessment_service
 from app.schemas.assessment import (
@@ -17,6 +18,7 @@ from app.schemas.assessment import (
     TriggerAssessmentRequest,
 )
 from app.services.assessment_service import AssessmentService
+from app.services.tts_service import generate_audio_b64
 
 router = APIRouter(prefix="/assessments", tags=["assessments"])
 
@@ -140,3 +142,18 @@ async def resume_session(
         return resp
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+@router.post("/tts")
+async def text_to_speech(req: TTSRequest):
+    """Generate realistic TTS audio from text. Returns base64 MP3."""
+    if not req.text or not req.text.strip():
+        raise HTTPException(status_code=400, detail="text is required")
+    audio_b64 = await generate_audio_b64(req.text)
+    if audio_b64 is None:
+        raise HTTPException(status_code=500, detail="TTS generation failed")
+    return {"audio_b64": audio_b64}

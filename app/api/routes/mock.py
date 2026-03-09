@@ -51,7 +51,7 @@ MOCK_INSTRUCTORS: dict[str, InstructorOut] = {
 }
 
 MOCK_STUDENTS: dict[str, StudentOut] = {
-    "stud-001": StudentOut(id="stud-001", name="Alice Johnson", course_id="course-001"),
+    "4220e987-8f0b-4196-b691-6c33620d4238": StudentOut(id="4220e987-8f0b-4196-b691-6c33620d4238", name="Alice Johnson", course_id="course-001"),
     "stud-002": StudentOut(id="stud-002", name="Bob Williams", course_id="course-001"),
     "stud-003": StudentOut(id="stud-003", name="Charlie Brown", course_id="course-002"),
 }

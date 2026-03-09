@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # Server
     server_host: str = "0.0.0.0"
-    server_port: int = 8080
+    server_port: int = 9999
 
     # Database
     db_host: str = "localhost"
@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Gemini / AI
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.0-flash"  # Options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-pro-preview-06-05
+
+    # TTS (Text-to-Speech)
+    tts_provider: str = "openai"  # Options: "openai" or "edge"
+    openai_api_key: str = ""
+    openai_tts_model: str = "tts-1-hd"  # "tts-1" (fast) or "tts-1-hd" (high quality)
+    openai_tts_voice: str = "nova"  # alloy, echo, fable, onyx, nova, shimmer
 
     # Logging
     log_level: str = "debug"

@@ -7,6 +7,7 @@ from app.models.assessment import (
     StudentResponse,
     ResponseCompetencyLink,
 )
+from app.models.voiceprint import Voiceprint, VoiceVerificationLog
 
 __all__ = [
     "Base",
@@ -16,4 +17,6 @@ __all__ = [
     "AssessmentQuestionInstance",
     "StudentResponse",
     "ResponseCompetencyLink",
+    "Voiceprint",
+    "VoiceVerificationLog",
 ]
