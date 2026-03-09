@@ -28,6 +28,7 @@ from app.api.routes.instructors import router as instructors_router
 from app.api.routes.llm import router as llm_router
 from app.api.routes.voice import router as voice_router
 from app.api.routes.voice_biometrics import router as voice_biometrics_router
+from app.api.routes.live_viva import router as live_viva_router
 
 # --- logging ---
 
@@ -87,6 +88,7 @@ app.include_router(assessments_router, prefix="/api/v1")
 app.include_router(assignments_router, prefix="/api/v1")
 app.include_router(voice_router, prefix="/api/v1")
 app.include_router(voice_biometrics_router, prefix="/api/v1")
+app.include_router(live_viva_router, prefix="/api/v1")
 app.include_router(students_router, prefix="/api/v1")
 app.include_router(instructors_router, prefix="/api/v1")
 
