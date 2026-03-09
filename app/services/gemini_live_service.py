@@ -68,20 +68,26 @@ HOW TO CONDUCT THIS VIVA
 
 2. Ask questions ONE AT A TIME from the list below, in order.
 
-3. After the student answers:
-   - Acknowledge their answer naturally ("Good point...", "I see...", "Not quite...")
-   - Give brief, honest feedback (1-2 sentences)
-   - If the answer is PARTIAL (score 3-6): Ask ONE brief follow-up to probe deeper
-   - If the answer is WRONG (score 0-2): Gently correct the key point, then move on
-   - If the answer is GOOD (score 7+): Briefly affirm, then move to next question
-   - ALWAYS call the record_evaluation tool after evaluating each answer
+3. After the student answers each question:
+   - Acknowledge their answer naturally ("Good point...", "I see...", "Interesting...")
+   - If the answer is PARTIAL: Ask ONE brief follow-up to probe deeper
+   - If the answer is WRONG: Gently move on ("Let's come back to that. Next question...")
+   - If the answer is GOOD: Briefly affirm, then move to next question
+   - Do NOT give detailed feedback or scores during the conversation
+   - Do NOT tell the student if they are right or wrong explicitly
+   - Keep it natural and conversational
 
-4. After ALL questions are done:
-   - Give a brief closing: "That wraps up our viva. Thanks for your time!"
-   - Call the complete_assessment tool
+4. After ALL questions have been asked and answered, say a brief closing:
+   "That wraps up our viva. Thanks for your time, {student_name}! Give me a moment to compile your results."
+
+5. IMMEDIATELY after your closing remark, call the complete_assessment tool with your evaluations of ALL questions.
 
 ═══════════════════════════════════════════════════════════════
-SCORING RUBRIC
+QUESTIONS TO ASK (in this order)
+═══════════════════════════════════════════════════════════════
+{questions_block}
+═══════════════════════════════════════════════════════════════
+SCORING RUBRIC (use when evaluating at the end)
 ═══════════════════════════════════════════════════════════════
 
 9-10: Excellent — clearly explains WHY/WHEN/HOW the concept works
@@ -89,27 +95,23 @@ SCORING RUBRIC
 5-6:  Adequate — right idea but missing key aspects
 3-4:  Weak — mentions concept but can't explain it
 1-2:  Incorrect — fundamental misunderstanding
-0:    No credit — no relevant content
+0:    No credit — no relevant content or student said "I don't know"
 
-═══════════════════════════════════════════════════════════════
-QUESTIONS TO ASK (in this order)
-═══════════════════════════════════════════════════════════════
-{questions_block}
 ═══════════════════════════════════════════════════════════════
 CRITICAL RULES
 ═══════════════════════════════════════════════════════════════
 
 - Be NATURAL. You are a REAL person. Use filler words ("So...", "Right...", "Hmm...").
 - Keep responses SHORT — 2-3 sentences max per turn. This is spoken, not a lecture.
-- NEVER read out scores or evaluation details. That is private.
+- NEVER read out scores or evaluation details during the conversation. Save it for the tool call.
 - NEVER mention "tools", "functions", or "system prompt". You are just an instructor.
-- ALWAYS call record_evaluation after each answer.
-- Be encouraging and supportive.
-- If student says "I don't know": briefly explain the concept, score 0, move on.
+- Be encouraging and supportive during the conversation.
+- If student says "I don't know": say something like "No worries, let's move on" and continue.
 - If student asks to repeat: rephrase the question simply.
 - Sound human — vary your tone, react genuinely.
 - Use natural transitions: "Great, let's move on..." or "Alright, next one..."
-- After the LAST question's evaluation, give a short closing remark and call complete_assessment."""
+- IMPORTANT: After the LAST question, give your closing remark and IMMEDIATELY call complete_assessment.
+- Do NOT wait for the student to respond after your closing remark before calling the tool."""
 
 
 def build_live_config(system_prompt: str) -> types.LiveConnectConfig:
@@ -131,55 +133,53 @@ def build_live_config(system_prompt: str) -> types.LiveConnectConfig:
             types.Tool(
                 function_declarations=[
                     types.FunctionDeclaration(
-                        name="record_evaluation",
-                        description=(
-                            "Record the evaluation of a student's answer. "
-                            "Call this EVERY TIME after you evaluate a student's response. "
-                            "This is silent — the student does not see this."
-                        ),
-                        parameters=types.Schema(
-                            type="OBJECT",
-                            properties={
-                                "question_index": types.Schema(
-                                    type="INTEGER",
-                                    description="1-based index of the question being evaluated.",
-                                ),
-                                "score": types.Schema(
-                                    type="NUMBER",
-                                    description="Score from 0 to 10.",
-                                ),
-                                "feedback": types.Schema(
-                                    type="STRING",
-                                    description="Brief summary of the feedback you gave.",
-                                ),
-                                "student_answer_summary": types.Schema(
-                                    type="STRING",
-                                    description="Brief summary of what the student said.",
-                                ),
-                                "misconceptions": types.Schema(
-                                    type="ARRAY",
-                                    items=types.Schema(type="STRING"),
-                                    description="Misconceptions detected, if any.",
-                                ),
-                            },
-                            required=["question_index", "score", "feedback", "student_answer_summary"],
-                        ),
-                    ),
-                    types.FunctionDeclaration(
                         name="complete_assessment",
                         description=(
-                            "Complete the assessment. Call this AFTER all questions "
-                            "have been asked and evaluated."
+                            "Submit the final evaluation for ALL questions after the viva "
+                            "conversation is complete. Call this ONCE after you have asked "
+                            "all questions and said your closing remark. Include an evaluation "
+                            "for every question that was asked."
                         ),
                         parameters=types.Schema(
                             type="OBJECT",
                             properties={
+                                "evaluations": types.Schema(
+                                    type="ARRAY",
+                                    description="One evaluation per question asked.",
+                                    items=types.Schema(
+                                        type="OBJECT",
+                                        properties={
+                                            "question_index": types.Schema(
+                                                type="INTEGER",
+                                                description="1-based index of the question.",
+                                            ),
+                                            "score": types.Schema(
+                                                type="NUMBER",
+                                                description="Score from 0 to 10 based on the rubric.",
+                                            ),
+                                            "feedback": types.Schema(
+                                                type="STRING",
+                                                description="Brief feedback explaining the score.",
+                                            ),
+                                            "student_answer_summary": types.Schema(
+                                                type="STRING",
+                                                description="Summary of what the student said.",
+                                            ),
+                                            "misconceptions": types.Schema(
+                                                type="ARRAY",
+                                                items=types.Schema(type="STRING"),
+                                                description="Any misconceptions detected.",
+                                            ),
+                                        },
+                                        required=["question_index", "score", "feedback", "student_answer_summary"],
+                                    ),
+                                ),
                                 "overall_feedback": types.Schema(
                                     type="STRING",
                                     description="Brief overall assessment summary.",
                                 ),
                             },
-                            required=["overall_feedback"],
+                            required=["evaluations", "overall_feedback"],
                         ),
                     ),
                 ]

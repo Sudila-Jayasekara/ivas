@@ -16,7 +16,7 @@ Protocol:
         JSON:   {"type": "thinking"}
         Binary: PCM audio from Gemini (24kHz, 16-bit, mono) — one complete turn
         JSON:   {"type": "turn_end"}
-        JSON:   {"type": "score", "question_number": 1, "score": 7.5, ...}
+        JSON:   {"type": "evaluating"}  — viva conversation done, evaluating all responses
         JSON:   {"type": "complete", "session_id": "...", "final_score": 35, "max_score": 50, ...}
         JSON:   {"type": "error", "message": "..."}
 """
@@ -336,16 +336,39 @@ async def live_viva(websocket: WebSocket) -> None:
         ) as gemini_session:
             logger.info("Gemini Live connected for session %s", session_id)
 
+            # Kick off the greeting — Gemini won't speak until prompted
+            await gemini_session.send_client_content(
+                turns=types.Content(
+                    role="user",
+                    parts=[types.Part(text="[The student has just sat down. Begin the viva now — greet them warmly and ask the first question.]")],
+                ),
+                turn_complete=True,
+            )
+            logger.info("Sent initial prompt to trigger greeting")
+
             # ── Two concurrent tasks: proxy audio bidirectionally ───
+
+            # Shared flag: don't forward mic audio until Gemini finishes greeting
+            greeting_done = False
+            mic_chunks_dropped = 0
+            mic_chunks_sent = 0
 
             async def client_to_gemini():
                 """Read audio from Flutter client → forward to Gemini."""
-                nonlocal session_complete
+                nonlocal session_complete, mic_chunks_dropped, mic_chunks_sent
                 try:
                     while not session_complete:
                         msg = await websocket.receive()
                         if "bytes" in msg and msg["bytes"]:
-                            # Binary = PCM audio from client mic
+                            # Only forward audio after Gemini has greeted
+                            if not greeting_done:
+                                mic_chunks_dropped += 1
+                                if mic_chunks_dropped % 50 == 1:
+                                    logger.info("Mic audio dropped (greeting pending): %d chunks so far", mic_chunks_dropped)
+                                continue
+                            mic_chunks_sent += 1
+                            if mic_chunks_sent % 50 == 1:
+                                logger.info("Forwarding mic chunk #%d to Gemini (%d bytes)", mic_chunks_sent, len(msg["bytes"]))
                             await gemini_session.send_realtime_input(
                                 audio=types.Blob(
                                     data=msg["bytes"],
@@ -356,8 +379,40 @@ async def live_viva(websocket: WebSocket) -> None:
                             data = json.loads(msg["text"])
                             if data.get("type") == "end":
                                 logger.info("Client requested end for session %s", session_id)
-                                session_complete = True
+                                # Ask Gemini to wrap up and evaluate all questions
+                                try:
+                                    await gemini_session.send_client_content(
+                                        turns=types.Content(
+                                            role="user",
+                                            parts=[types.Part(text=(
+                                                "[The student has ended the session. "
+                                                "Wrap up immediately with a brief closing remark, "
+                                                "then call complete_assessment with evaluations for "
+                                                "all questions discussed so far. For questions not "
+                                                "asked yet, give a score of 0.]"
+                                            ))],
+                                        ),
+                                        turn_complete=True,
+                                    )
+                                except Exception as e:
+                                    logger.error("Failed to prompt Gemini for evaluation: %s", e)
+                                    session_complete = True
                                 break
+                            elif data.get("type") == "message":
+                                # Text input from client (simulator / text-mode fallback)
+                                text = data.get("text", "").strip()
+                                if text:
+                                    logger.info("Text message from student: %s", text[:100])
+                                    try:
+                                        await gemini_session.send_client_content(
+                                            turns=types.Content(
+                                                role="user",
+                                                parts=[types.Part(text=text)],
+                                            ),
+                                            turn_complete=True,
+                                        )
+                                    except Exception as e:
+                                        logger.error("Failed to forward text to Gemini: %s", e)
                 except WebSocketDisconnect:
                     logger.info("Client disconnected from live viva %s", session_id)
                     session_complete = True
@@ -367,85 +422,91 @@ async def live_viva(websocket: WebSocket) -> None:
 
             async def gemini_to_client():
                 """Read from Gemini → forward audio and handle tool calls."""
-                nonlocal session_complete
-                audio_buffer = bytearray()
-                evaluation_count = 0
+                nonlocal session_complete, greeting_done
 
                 try:
                     async for response in gemini_session.receive():
                         if session_complete:
                             break
 
-                        # ── Handle model audio/text output ──────────
-                        if response.server_content:
-                            if response.server_content.model_turn:
-                                for part in response.server_content.model_turn.parts:
-                                    if part.inline_data and part.inline_data.data:
-                                        audio_buffer.extend(part.inline_data.data)
+                        # Log every response for debugging
+                        has_content = response.server_content is not None
+                        has_tool = response.tool_call is not None
+                        has_setup = getattr(response, 'setup_complete', None) is not None
+                        logger.info(
+                            "Gemini msg: content=%s tool=%s setup=%s",
+                            has_content, has_tool, has_setup,
+                        )
 
-                            if response.server_content.turn_complete:
-                                # Send buffered audio as one chunk
-                                if audio_buffer:
-                                    await websocket.send_bytes(bytes(audio_buffer))
-                                    audio_buffer = bytearray()
+                        # ── Handle model audio/text output ──────────
+                        # Stream each audio chunk IMMEDIATELY to client
+                        # for real-time playback (like the Gemini app).
+                        if response.server_content:
+                            sc = response.server_content
+                            if sc.model_turn:
+                                for part in sc.model_turn.parts:
+                                    has_audio = (part.inline_data is not None and
+                                                 part.inline_data.data is not None)
+                                    if has_audio:
+                                        await websocket.send_bytes(part.inline_data.data)
+
+                            if sc.turn_complete:
+                                logger.info("  turn_complete, greeting_done=%s", greeting_done)
                                 await websocket.send_json({"type": "turn_end"})
+                                if not greeting_done:
+                                    greeting_done = True
+                                    logger.info("Greeting done — mic forwarding enabled")
+
+                            if getattr(sc, 'interrupted', False):
+                                logger.info("  ** Gemini turn was INTERRUPTED **")
 
                         # ── Handle tool calls ───────────────────────
                         if response.tool_call:
                             for fc in response.tool_call.function_calls:
                                 logger.info("Tool call: %s(%s)", fc.name, fc.args)
 
-                                if fc.name == "record_evaluation":
-                                    evaluation_count += 1
+                                if fc.name == "complete_assessment":
+                                    # Notify client that evaluation is in progress
+                                    await websocket.send_json({"type": "evaluating"})
+
                                     args = fc.args or {}
-                                    q_index = int(args.get("question_index", 0))
-                                    score = float(args.get("score", 0))
-                                    feedback = str(args.get("feedback", ""))
-                                    student_answer = str(args.get("student_answer_summary", ""))
-                                    misconceptions = args.get("misconceptions", []) or []
+                                    evaluations = args.get("evaluations", [])
+                                    overall_feedback = str(args.get("overall_feedback", ""))
 
-                                    # Clamp score
-                                    score = max(0.0, min(10.0, score))
-
-                                    if 1 <= q_index <= len(questions):
-                                        question = questions[q_index - 1]
-                                        try:
-                                            await store_live_evaluation(
-                                                session_id=session_id,
-                                                question=question,
-                                                score=score,
-                                                feedback=feedback,
-                                                student_answer=student_answer,
-                                                misconceptions=misconceptions,
-                                                sequence_number=evaluation_count,
-                                            )
-                                        except Exception as e:
-                                            logger.error("Failed to store evaluation: %s", e)
-
-                                    scores.append({
-                                        "question_number": q_index,
-                                        "score": score,
-                                    })
-
-                                    # Notify client of score
-                                    await websocket.send_json({
-                                        "type": "score",
-                                        "question_number": q_index,
-                                        "score": score,
-                                        "total_scored": len(scores),
-                                        "total_questions": len(questions),
-                                    })
-
-                                    # Send tool response to Gemini
-                                    await gemini_session.send_tool_response(
-                                        function_responses=[types.FunctionResponse(
-                                            id=fc.id,
-                                            name=fc.name,
-                                            response={"status": "recorded"},
-                                        )]
+                                    logger.info(
+                                        "Received %d evaluations for session %s (feedback: %s)",
+                                        len(evaluations), session_id, overall_feedback[:100],
                                     )
 
-                                elif fc.name == "complete_assessment":
+                                    # Store each evaluation
+                                    for eval_data in evaluations:
+                                        q_index = int(eval_data.get("question_index", 0))
+                                        score = float(eval_data.get("score", 0))
+                                        score = max(0.0, min(10.0, score))
+                                        feedback = str(eval_data.get("feedback", ""))
+                                        student_answer = str(eval_data.get("student_answer_summary", ""))
+                                        misconceptions = eval_data.get("misconceptions", []) or []
+
+                                        if 1 <= q_index <= len(questions):
+                                            question = questions[q_index - 1]
+                                            try:
+                                                await store_live_evaluation(
+                                                    session_id=session_id,
+                                                    question=question,
+                                                    score=score,
+                                                    feedback=feedback,
+                                                    student_answer=student_answer,
+                                                    misconceptions=misconceptions,
+                                                    sequence_number=q_index,
+                                                )
+                                            except Exception as e:
+                                                logger.error("Failed to store evaluation: %s", e)
+
+                                            scores.append({
+                                                "question_number": q_index,
+                                                "score": score,
+                                            })
+
                                     # Complete the session
                                     try:
                                         completion = await complete_live_session(session_id)
@@ -465,7 +526,7 @@ async def live_viva(websocket: WebSocket) -> None:
                                         "competency_summary": completion["competency_summary"],
                                     })
 
-                                    # Send tool response
+                                    # Send tool response to Gemini
                                     await gemini_session.send_tool_response(
                                         function_responses=[types.FunctionResponse(
                                             id=fc.id,
