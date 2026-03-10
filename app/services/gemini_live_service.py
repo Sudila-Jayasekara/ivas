@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from google import genai
 from google.genai import types
+from google.genai.types import HttpOptions
 
 from app.config import settings
 
@@ -115,7 +116,12 @@ CRITICAL RULES
 
 
 def build_live_config(system_prompt: str) -> types.LiveConnectConfig:
-    """Build the Gemini Live connection configuration."""
+    """Build the Gemini Live connection configuration.
+
+    Uses automatic VAD (Voice Activity Detection) — Gemini handles all
+    turn-taking. Audio streams bidirectionally and Gemini decides when
+    the student has finished speaking and when to respond.
+    """
 
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
@@ -129,6 +135,16 @@ def build_live_config(system_prompt: str) -> types.LiveConnectConfig:
                 )
             )
         ),
+        realtime_input_config=types.RealtimeInputConfig(
+            automatic_activity_detection=types.AutomaticActivityDetection(
+                disabled=False,
+                start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_HIGH,
+                end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
+                prefix_padding_ms=20,
+                silence_duration_ms=500,
+            ),
+        ),
+        input_audio_transcription=types.AudioTranscriptionConfig(),
         tools=[
             types.Tool(
                 function_declarations=[
@@ -189,7 +205,17 @@ def build_live_config(system_prompt: str) -> types.LiveConnectConfig:
 
 
 def create_gemini_client() -> genai.Client:
-    """Create a Gemini API client."""
+    """Create a Gemini API client with extended websocket keepalive timeout.
+
+    The default websockets ping_timeout (20s) is too short when Gemini
+    streams long audio responses — the pong can't be processed in time,
+    causing a spurious 'keepalive ping timeout' disconnect.
+    """
     if not settings.gemini_api_key:
         raise ValueError("GEMINI_API_KEY is not set. Live viva requires Gemini.")
-    return genai.Client(api_key=settings.gemini_api_key)
+    return genai.Client(
+        api_key=settings.gemini_api_key,
+        http_options=HttpOptions(
+            async_client_args={"ping_interval": None},
+        ),
+    )

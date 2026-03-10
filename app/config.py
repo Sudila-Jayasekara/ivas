@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # Gemini / AI
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"  # Options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-pro-preview-06-05
+    gemini_model: str = "gemini-2.5-flash"  # Options: gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-pro-preview-06-05
     gemini_live_model: str = "gemini-2.5-flash-native-audio-latest"  # Model for Gemini Live API (real-time voice)
 
     # TTS (Text-to-Speech)

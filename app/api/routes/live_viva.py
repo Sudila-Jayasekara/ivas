@@ -271,11 +271,11 @@ async def complete_live_session(session_id: str) -> dict:
 
 @router.websocket("/sessions/live")
 async def live_viva(websocket: WebSocket) -> None:
-    """Live voice-to-voice viva assessment via Gemini Live API.
+    """Live voice-to-voice viva via Gemini Live API.
 
-    The student speaks naturally. Gemini acts as the instructor — asks questions,
-    evaluates answers, gives feedback, all via voice. Tool calls handle scoring
-    silently in the background.
+    Fully bidirectional audio streaming. Gemini's built-in VAD handles all
+    turn-taking — it knows when the student is speaking vs silent and
+    responds automatically. No manual turn gating needed.
     """
     await websocket.accept()
     logger.info("Live viva WebSocket connected")
@@ -336,7 +336,7 @@ async def live_viva(websocket: WebSocket) -> None:
         ) as gemini_session:
             logger.info("Gemini Live connected for session %s", session_id)
 
-            # Kick off the greeting — Gemini won't speak until prompted
+            # Kick off the greeting — Gemini speaks first
             await gemini_session.send_client_content(
                 turns=types.Content(
                     role="user",
@@ -347,39 +347,45 @@ async def live_viva(websocket: WebSocket) -> None:
             logger.info("Sent initial prompt to trigger greeting")
 
             # ── Two concurrent tasks: proxy audio bidirectionally ───
+            # No gating — Gemini VAD handles turn-taking automatically.
+            # Audio flows continuously in both directions.
 
-            # Shared flag: don't forward mic audio until Gemini finishes greeting
-            greeting_done = False
-            mic_chunks_dropped = 0
             mic_chunks_sent = 0
 
             async def client_to_gemini():
-                """Read audio from Flutter client → forward to Gemini."""
-                nonlocal session_complete, mic_chunks_dropped, mic_chunks_sent
+                """Forward all audio from Flutter → Gemini. Always."""
+                nonlocal session_complete, mic_chunks_sent
                 try:
                     while not session_complete:
-                        msg = await websocket.receive()
+                        try:
+                            msg = await websocket.receive()
+                        except Exception as e:
+                            logger.info("Client WebSocket receive failed: %s", e)
+                            session_complete = True
+                            break
+                        if msg.get("type") == "websocket.disconnect":
+                            logger.info("Client disconnected (clean close)")
+                            session_complete = True
+                            break
                         if "bytes" in msg and msg["bytes"]:
-                            # Only forward audio after Gemini has greeted
-                            if not greeting_done:
-                                mic_chunks_dropped += 1
-                                if mic_chunks_dropped % 50 == 1:
-                                    logger.info("Mic audio dropped (greeting pending): %d chunks so far", mic_chunks_dropped)
-                                continue
                             mic_chunks_sent += 1
-                            if mic_chunks_sent % 50 == 1:
-                                logger.info("Forwarding mic chunk #%d to Gemini (%d bytes)", mic_chunks_sent, len(msg["bytes"]))
-                            await gemini_session.send_realtime_input(
-                                audio=types.Blob(
-                                    data=msg["bytes"],
-                                    mime_type="audio/pcm;rate=16000",
+                            if mic_chunks_sent <= 3 or mic_chunks_sent % 100 == 0:
+                                logger.info("Mic chunk #%d (%d bytes)", mic_chunks_sent, len(msg["bytes"]))
+                            try:
+                                await gemini_session.send_realtime_input(
+                                    audio=types.Blob(
+                                        data=msg["bytes"],
+                                        mime_type="audio/pcm;rate=16000",
+                                    )
                                 )
-                            )
+                            except Exception as e:
+                                logger.error("send_realtime_input failed: %s", e)
+                                session_complete = True
+                                break
                         elif "text" in msg:
                             data = json.loads(msg["text"])
                             if data.get("type") == "end":
-                                logger.info("Client requested end for session %s", session_id)
-                                # Ask Gemini to wrap up and evaluate all questions
+                                logger.info("Client requested end")
                                 try:
                                     await gemini_session.send_client_content(
                                         turns=types.Content(
@@ -395,14 +401,26 @@ async def live_viva(websocket: WebSocket) -> None:
                                         turn_complete=True,
                                     )
                                 except Exception as e:
-                                    logger.error("Failed to prompt Gemini for evaluation: %s", e)
+                                    logger.error("Failed to send end prompt: %s", e)
                                     session_complete = True
                                 break
+                            elif data.get("type") == "mic_off":
+                                # Student stopped mic — explicitly signal end of turn
+                                # so Gemini processes the answer and asks the next question.
+                                # (Just stopping audio isn't "silence" — it's nothing, and
+                                #  Gemini's VAD would wait forever for more audio.)
+                                logger.info("Mic off — signalling turn complete to Gemini")
+                                try:
+                                    await gemini_session.send_client_content(
+                                        turn_complete=True,
+                                    )
+                                except Exception as e:
+                                    logger.error("Failed to send turn_complete: %s", e)
                             elif data.get("type") == "message":
-                                # Text input from client (simulator / text-mode fallback)
+                                # Text message from simulator client (no mic)
                                 text = data.get("text", "").strip()
                                 if text:
-                                    logger.info("Text message from student: %s", text[:100])
+                                    logger.info("Text message from client: %s", text[:80])
                                     try:
                                         await gemini_session.send_client_content(
                                             turns=types.Content(
@@ -412,73 +430,117 @@ async def live_viva(websocket: WebSocket) -> None:
                                             turn_complete=True,
                                         )
                                     except Exception as e:
-                                        logger.error("Failed to forward text to Gemini: %s", e)
-                except WebSocketDisconnect:
-                    logger.info("Client disconnected from live viva %s", session_id)
-                    session_complete = True
+                                        logger.error("Failed to send text message: %s", e)
                 except Exception as e:
                     logger.error("client_to_gemini error: %s", e)
                     session_complete = True
 
             async def gemini_to_client():
-                """Read from Gemini → forward audio and handle tool calls."""
-                nonlocal session_complete, greeting_done
+                """Forward Gemini audio → Flutter, handle tool calls and interruptions."""
+                nonlocal session_complete
+                gemini_speaking = False
+                audio_buffer = bytearray()
+                AUDIO_BUFFER_THRESHOLD = 16000  # ~0.33s of 24kHz 16-bit mono
+
+                async def flush_audio():
+                    nonlocal audio_buffer
+                    if audio_buffer:
+                        try:
+                            await websocket.send_bytes(bytes(audio_buffer))
+                        except Exception as e:
+                            logger.error("Failed to send audio to client: %s", e)
+                            nonlocal session_complete
+                            session_complete = True
+                            return
+                        audio_buffer.clear()
 
                 try:
                     async for response in gemini_session.receive():
                         if session_complete:
                             break
 
-                        # Log every response for debugging
-                        has_content = response.server_content is not None
-                        has_tool = response.tool_call is not None
-                        has_setup = getattr(response, 'setup_complete', None) is not None
-                        logger.info(
-                            "Gemini msg: content=%s tool=%s setup=%s",
-                            has_content, has_tool, has_setup,
-                        )
-
-                        # ── Handle model audio/text output ──────────
-                        # Stream each audio chunk IMMEDIATELY to client
-                        # for real-time playback (like the Gemini app).
+                        # ── Audio / content from Gemini ─────────────
                         if response.server_content:
                             sc = response.server_content
+
+                            # Buffer audio chunks and send in batches
                             if sc.model_turn:
                                 for part in sc.model_turn.parts:
-                                    has_audio = (part.inline_data is not None and
-                                                 part.inline_data.data is not None)
-                                    if has_audio:
-                                        await websocket.send_bytes(part.inline_data.data)
+                                    if (part.inline_data is not None and
+                                            part.inline_data.data is not None):
+                                        if not gemini_speaking:
+                                            gemini_speaking = True
+                                            try:
+                                                await websocket.send_json({"type": "gemini_speaking"})
+                                            except Exception as e:
+                                                logger.error("Failed to send gemini_speaking to client: %s", e)
+                                                session_complete = True
+                                                break
+                                        audio_buffer.extend(part.inline_data.data)
+                                        if len(audio_buffer) >= AUDIO_BUFFER_THRESHOLD:
+                                            await flush_audio()
 
+                            # Gemini finished a turn
                             if sc.turn_complete:
-                                logger.info("  turn_complete, greeting_done=%s", greeting_done)
-                                await websocket.send_json({"type": "turn_end"})
-                                if not greeting_done:
-                                    greeting_done = True
-                                    logger.info("Greeting done — mic forwarding enabled")
+                                await flush_audio()
+                                logger.info("Gemini turn complete")
+                                gemini_speaking = False
+                                try:
+                                    await websocket.send_json({"type": "turn_end"})
+                                except Exception as e:
+                                    logger.error("Failed to send turn_end to client: %s", e)
+                                    session_complete = True
+                                    break
 
+                            # Student interrupted Gemini (barge-in)
                             if getattr(sc, 'interrupted', False):
-                                logger.info("  ** Gemini turn was INTERRUPTED **")
+                                await flush_audio()
+                                logger.info("Gemini interrupted by student")
+                                gemini_speaking = False
+                                try:
+                                    await websocket.send_json({"type": "interrupted"})
+                                except Exception as e:
+                                    logger.error("Failed to send interrupted to client: %s", e)
+                                    session_complete = True
+                                    break
 
-                        # ── Handle tool calls ───────────────────────
+                            # Input transcription (what Gemini heard the student say)
+                            if hasattr(sc, 'input_transcription') and sc.input_transcription:
+                                text = getattr(sc.input_transcription, 'text', '')
+                                if text:
+                                    logger.info("Student said: %s", text[:200])
+                                    try:
+                                        await websocket.send_json({
+                                            "type": "transcript",
+                                            "text": text,
+                                        })
+                                    except Exception as e:
+                                        logger.error("Failed to send transcript to client: %s", e)
+                                        session_complete = True
+                                        break
+
+                        # ── Tool calls (scoring) ────────────────────
                         if response.tool_call:
                             for fc in response.tool_call.function_calls:
-                                logger.info("Tool call: %s(%s)", fc.name, fc.args)
+                                logger.info("Tool call: %s", fc.name)
 
                                 if fc.name == "complete_assessment":
-                                    # Notify client that evaluation is in progress
-                                    await websocket.send_json({"type": "evaluating"})
+                                    try:
+                                        await websocket.send_json({"type": "evaluating"})
+                                    except Exception as e:
+                                        logger.error("Failed to send evaluating to client: %s", e)
+                                        session_complete = True
+                                        break
 
                                     args = fc.args or {}
                                     evaluations = args.get("evaluations", [])
                                     overall_feedback = str(args.get("overall_feedback", ""))
 
                                     logger.info(
-                                        "Received %d evaluations for session %s (feedback: %s)",
-                                        len(evaluations), session_id, overall_feedback[:100],
+                                        "Received %d evaluations (feedback: %s)",
+                                        len(evaluations), overall_feedback[:100],
                                     )
 
-                                    # Store each evaluation
                                     for eval_data in evaluations:
                                         q_index = int(eval_data.get("question_index", 0))
                                         score = float(eval_data.get("score", 0))
@@ -500,14 +562,13 @@ async def live_viva(websocket: WebSocket) -> None:
                                                     sequence_number=q_index,
                                                 )
                                             except Exception as e:
-                                                logger.error("Failed to store evaluation: %s", e)
+                                                logger.error("Failed to store eval: %s", e)
 
                                             scores.append({
                                                 "question_number": q_index,
                                                 "score": score,
                                             })
 
-                                    # Complete the session
                                     try:
                                         completion = await complete_live_session(session_id)
                                     except Exception as e:
@@ -518,15 +579,17 @@ async def live_viva(websocket: WebSocket) -> None:
                                             "competency_summary": [],
                                         }
 
-                                    await websocket.send_json({
-                                        "type": "complete",
-                                        "session_id": session_id,
-                                        "final_score": completion["final_score"],
-                                        "max_score": completion["max_score"],
-                                        "competency_summary": completion["competency_summary"],
-                                    })
+                                    try:
+                                        await websocket.send_json({
+                                            "type": "complete",
+                                            "session_id": session_id,
+                                            "final_score": completion["final_score"],
+                                            "max_score": completion["max_score"],
+                                            "competency_summary": completion["competency_summary"],
+                                        })
+                                    except Exception as e:
+                                        logger.error("Failed to send complete to client: %s", e)
 
-                                    # Send tool response to Gemini
                                     await gemini_session.send_tool_response(
                                         function_responses=[types.FunctionResponse(
                                             id=fc.id,
@@ -544,12 +607,11 @@ async def live_viva(websocket: WebSocket) -> None:
                         try:
                             await websocket.send_json({
                                 "type": "error",
-                                "message": "Connection to AI instructor lost. Please try again.",
+                                "message": "Connection to AI instructor lost.",
                             })
                         except Exception:
                             pass
 
-            # Run both tasks concurrently
             await asyncio.gather(
                 client_to_gemini(),
                 gemini_to_client(),
